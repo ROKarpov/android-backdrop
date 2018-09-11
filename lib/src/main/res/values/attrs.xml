@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="BackdropBackLayer_Layout">
+        <attr name="layout_childType">
+            <enum name="content" value="0x0"/>
+            <enum name="header" value="0x1"/>
+        </attr>
+        <attr name="layout_hideHeaderOnReveal" format="boolean"/>
+        <attr name="layout_scrimOnReveal" format="boolean"/>
+    </declare-styleable>
+
+    <declare-styleable name="BackdropBackLayer_Behavior">
+        <attr name="behavior_minFrontViewRevealedHeight" format="dimension"/>
+    </declare-styleable>
+
+    <declare-styleable name="BackdropFrontLayer_Layout">
+        <attr name="layout_childType0">
+            <enum name="content" value="0x0"/>
+            <enum name="header" value="0x1"/>
+        </attr>
+    </declare-styleable>
+</resources>

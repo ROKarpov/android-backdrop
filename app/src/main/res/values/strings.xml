@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Backdrop Layout Demo</string>
+    <string name="hint_text">Hint</string>
+
+    <string name="ic_hamburger__path">M3,6 L3,8 L21,8 L21,6 Z M3,11 L3,13 L21,13 L21,11 Z M3,16 L3,18 L21,18 L21,16 Z</string>
+    <string name="ic_close__path">M6.41,5 L5,6.41 L17.59 19 L19 17.59 Z M12,11 L12,13 L12,13 L12,11 Z M5,17.59 L6.41,19 L19,6.41 L17.59,5 Z</string>
+
+    <string name="menu_main__filter_title">Filter</string>
+    <string name="menu_main__snack_title">Snack</string>
+    <string name="menu_navigation__single_view_title">Single Back View (Hidden Toolbar on reveal)</string>
+    <string name="menu_navigation__two_views_title">Two Back Views</string>
+    <string name="main__navigation_title">Navigation</string>
+    <string name="main__tune_title">Filter</string>
+</resources>

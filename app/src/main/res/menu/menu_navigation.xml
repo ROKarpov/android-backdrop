@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+      xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_navigation__single_view"
+        android:checkable="true"
+        android:checked="false"
+        android:title="@string/menu_navigation__single_view_title"/>
+    <item
+        android:id="@+id/menu_navigation__two_views"
+        android:checkable="true"
+        android:title="@string/menu_navigation__two_views_title"/>
+</menu>
