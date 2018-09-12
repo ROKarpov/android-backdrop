@@ -2,9 +2,9 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/android-backdrop.iml" filepath="$PROJECT_DIR$/android-backdrop.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/backdrop.iml" filepath="$PROJECT_DIR$/backdrop.iml" />
-      <module fileurl="file://$PROJECT_DIR$/lib/lib.iml" filepath="$PROJECT_DIR$/lib/lib.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backdrop/backdrop.iml" filepath="$PROJECT_DIR$/backdrop/backdrop.iml" />
     </modules>
   </component>
 </project>

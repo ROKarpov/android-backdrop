@@ -36,8 +36,8 @@ ext {
 
     libraryDescription = 'Views that implement the Backdrop component for Android.'
 
-    siteUrl = 'https://github.com/ROKarpov/backdrop'
-    gitUrl = 'https://github.com/ROKarpov/backdrop.git'
+    siteUrl = 'https://github.com/ROKarpov/android-backdrop'
+    gitUrl = 'https://github.com/ROKarpov/android-backdrop.git'
 
     libraryVersion = '0.1'
 
