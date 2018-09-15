@@ -65,10 +65,17 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         }
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         // TODO: MODIFY TO ALLOW ONLY TWO CHILDREN!
-        val widthMeasureMode = MeasureSpec.getMode(widthMeasureSpec);
-        val heightMeasureMode = MeasureSpec.getMode(heightMeasureSpec);
+        val widthMeasureMode = MeasureSpec.getMode(widthMeasureSpec)
+        val heightMeasureMode = MeasureSpec.getMode(heightMeasureSpec)
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        val height = MeasureSpec.getSize(heightMeasureSpec)
+
         val measureMatchParentChildren = (widthMeasureMode != MeasureSpec.EXACTLY) || (heightMeasureMode != MeasureSpec.EXACTLY)
 
         val header = headerView
@@ -199,8 +206,9 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
     }
 
     private fun measureContentView(view: View, widthMeasureSpec: Int, heightMeasureSpec: Int, offset: Int) {
-        val childWidthMeasureSpec = getChildMeasureSpec(widthMeasureSpec, paddingLeft + paddingRight, measuredWidth)
-        val childHeightHeightSpec = getChildMeasureSpec(heightMeasureSpec, paddingTop + paddingBottom, measuredHeight - offset)
+        val lp = view.layoutParams;
+        val childWidthMeasureSpec = getChildMeasureSpec(widthMeasureSpec, paddingLeft + paddingRight, lp.width)
+        val childHeightHeightSpec = getChildMeasureSpec(heightMeasureSpec, paddingTop + paddingBottom + offset, lp.height)
         view.measure(childWidthMeasureSpec, childHeightHeightSpec)
     }
     private fun isContentView(view: View): Boolean {

@@ -37,8 +37,8 @@ class MainActivity : AppCompatActivity() {
                         Mapping().withMenuItem(R.id.menu_main__tune)
                                 .withContentView(R.id.main__tune_back_layer)
                                 .withAppTitle(R.string.main__tune_title))
-                .withConcealedNavigationIcon(resources.getDrawable(R.drawable.vd_hamburger))
-                .withRevealedNavigationIcon(resources.getDrawable(R.drawable.vd_close))
+                .withConcealedNavigationIcon(resources.getDrawable(R.drawable.ic_hamburger))
+                .withRevealedNavigationIcon(resources.getDrawable(R.drawable.ic_close))
                 .build()
     }
 

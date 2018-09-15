@@ -114,7 +114,7 @@ task dokkaJavadoc(type: org.jetbrains.dokka.gradle.DokkaTask) {
 }
 
 task javadocJar(type: Jar, dependsOn: dokkaJavadoc) {
-    classifier = 'dokkaJavadoc'
+    classifier = 'javadoc'
     from javadoc.destinationDir
 }
 
