@@ -252,21 +252,21 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
         class AnimatorProvider: BackdropBackLayer.FrontLayerBehavior.AnimatorProvider<BackdropFrontLayer>() {
-            override fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, animationConfig: AnimationConfig) {
-                super.addRevealAnimator(backLayer, animatorSet, animationConfig)
+            override fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long) {
+                super.addRevealAnimator(backLayer, animatorSet, inAnimationDuration, outAnimationDuration)
 
                 val contentView = frontLayer.contentView ?: return
                 val translateAnimator = ObjectAnimator.ofFloat(contentView, View.ALPHA, contentView.alpha, BackdropFrontLayer.REVEALED_ALPHA)
-                translateAnimator.duration = animationConfig.totalDuration
+                translateAnimator.duration = inAnimationDuration + outAnimationDuration
                 animatorSet.play(translateAnimator)
             }
 
-            override fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, animationConfig: AnimationConfig) {
-                super.addConcealAnimator(backLayer, animatorSet, animationConfig)
+            override fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long) {
+                super.addConcealAnimator(backLayer, animatorSet, inAnimationDuration, outAnimationDuration)
 
                 val contentView = frontLayer.contentView ?: return
                 val translateAnimator = ObjectAnimator.ofFloat(contentView, View.ALPHA, contentView.alpha, BackdropFrontLayer.CONCEALED_ALPHA)
-                translateAnimator.duration = animationConfig.totalDuration
+                translateAnimator.duration = inAnimationDuration + outAnimationDuration
                 animatorSet.play(translateAnimator)
             }
         }

@@ -14,9 +14,7 @@ import android.view.*
 import android.view.MotionEvent
 import java.lang.ref.WeakReference
 
-
-@CoordinatorLayout.DefaultBehavior(BackdropBackLayer.Behavior::class)
-class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
+class BackdropBackLayer: ViewGroup {
     companion object {
         internal const val NO_HEADER_MSG = "The BackdropBackLayer must contain the Header view."
         internal const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one Header view."
@@ -33,16 +31,16 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
     private val matchedParentChildren: MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
     private val interactionData : MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
 
-    private var state: BackdropBackLayerState = DEFAULT_STATE
+    @JvmField internal var state: BackdropBackLayerState = DEFAULT_STATE
 
-    private lateinit var headerView: View
+    internal lateinit var headerView: View
     @JvmField internal var revealedView: View? = null
-    private var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
+    @JvmField internal var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
+    @JvmField internal var currentAnimator: Animator? = null
 
     // TODO: Make listeners weak.
     private val listeners: MutableList<Listener> = mutableListOf()
     private val animatorProviders: MutableList<AnimatorProvider> = mutableListOf()
-    private var startedAnimator: Animator? = null
 
     constructor(context: Context): this(context, null)
     constructor(context: Context, attrs: AttributeSet?): this(context, attrs, 0)
@@ -65,36 +63,8 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
     }
     fun revealBackView(viewToReveal: View, withAnimation: Boolean = true): Boolean {
         if (revealedView == viewToReveal) return false
-
         val interactionData = interactionData[viewToReveal] ?: return false
-        val prevView = revealedView
-        val prevInteractionData = revealedViewInteractionData
-        revealedView = viewToReveal
-        revealedViewInteractionData = interactionData
-        state = BackdropBackLayerState.REVEALED
-
-        startedAnimator?.cancel()
-        startedAnimator?.cancel()
-
-        if (withAnimation) {
-            val animatorSet = AnimatorSet()
-            val animConfig = interactionData.addOnRevealAnimators(animatorSet, viewToReveal, headerView, prevView, prevInteractionData)
-            addCustomRevealAnimators(animatorSet, animConfig)
-            animatorSet.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    isAnimated = false
-                    notifyReveal(viewToReveal)
-                }
-            })
-            startedAnimator = animatorSet
-            isAnimated = true
-            animatorSet.start()
-        }
-        else {
-            interactionData.reveal(viewToReveal, headerView, prevView)
-            notifyReveal(viewToReveal)
-        }
-        return true
+        return state.onReveal(this, viewToReveal, interactionData, withAnimation)
     }
 
     fun concealBackView(): Boolean {
@@ -102,33 +72,8 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
     }
     fun concealBackView(withAnimation: Boolean): Boolean {
         val viewToConceal = revealedView ?: return false
-        val interactionDataToConceal = revealedViewInteractionData ?: return false
-
-        revealedView = null
-        revealedViewInteractionData = null
-        state = BackdropBackLayerState.CONCEALED
-
-        startedAnimator?.cancel()
-
-        if (withAnimation) {
-            val animatorSet = AnimatorSet()
-            val animConfig = interactionDataToConceal.addOnConcealAnimators(animatorSet, viewToConceal, headerView)
-            addCustomConcealAnimators(animatorSet, animConfig)
-            animatorSet.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    isAnimated = false
-                    notifyConceal(viewToConceal)
-                }
-            })
-            startedAnimator = animatorSet
-            isAnimated = true
-            animatorSet.start()
-
-        } else {
-            interactionDataToConceal.conceal(viewToConceal, headerView)
-            notifyConceal(viewToConceal)
-        }
-        return true
+        val interactionData = revealedViewInteractionData ?: return false
+        return state.onConceal(this, viewToConceal, interactionData, withAnimation)
     }
 
     fun updateChildState() {
@@ -172,7 +117,7 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
         if (params is LayoutParams)
             when(params.childType) {
                 LayoutParams.CONTENT_CHILD_TYPE -> {
-                    val data = BackdropBackLayerInteractionData(params.shouldHideHeader)
+                    val data = BackdropBackLayerInteractionData(this, params.shouldHideHeader)
                     interactionData[child] = data
                 }
                 LayoutParams.HEADER_CHILD_TYPE -> {
@@ -294,12 +239,6 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
         super.onRestoreInstanceState(state)
     }
 
-    //region CoordinatorLayout.AttachedBehavior
-    override fun getBehavior(): CoordinatorLayout.Behavior<*> {
-        return Behavior(this.resources.getDimensionPixelSize(R.dimen.default_min_front_layer_visible_height))
-    }
-    //endregion
-
     internal val currentExtraHeight: Int
         get() = state.getContentHeight(revealedViewInteractionData, revealedView, headerView)
 
@@ -317,29 +256,33 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
         val horizontalPadding = paddingLeft + paddingRight
         val childWidthMeasureSpec = ViewGroup.getChildMeasureSpec(widthMeasureSpec, horizontalPadding, lp.width)
         val verticalPadding = paddingTop + paddingBottom + contentVerticalOffset
-        val childHeightMeasureSpec = ViewGroup.getChildMeasureSpec(heightMeasureSpec, verticalPadding, lp.height)
+        val childHeightMeasureSpec = ViewGroup.getChildMeasureSpec(heightMeasureSpec, verticalPadding + lp.minRevealedFrontViewHeight, lp.height)
         view.measure(childWidthMeasureSpec, childHeightMeasureSpec)
     }
 
-    private fun notifyReveal(revealedView: View) {
+    internal fun notifyReveal(revealedView: View) {
         for (listener in listeners) {
             listener.onReveal(this, revealedView)
         }
     }
-    private fun notifyConceal(revealedView: View) {
+    internal fun notifyConceal(revealedView: View) {
         for (listener in listeners) {
             listener.onConceal(this, revealedView)
         }
     }
 
-    private fun addCustomRevealAnimators(animatorSet: AnimatorSet, animationConfig: AnimationConfig) {
+    internal fun addCustomRevealAnimators(animatorSet: AnimatorSet,
+                                          inAnimationDuration: Long,
+                                          outAnimationDuration: Long) {
         for (provider in animatorProviders) {
-            provider.addRevealAnimator(this, animatorSet, animationConfig)
+            provider.addRevealAnimator(this, animatorSet, inAnimationDuration, outAnimationDuration)
         }
     }
-    private fun addCustomConcealAnimators(animatorSet: AnimatorSet, animationConfig: AnimationConfig) {
+    internal fun addCustomConcealAnimators(animatorSet: AnimatorSet,
+                                           inAnimationDuration: Long,
+                                           outAnimationDuration: Long) {
         for (provider in animatorProviders) {
-            provider.addConcealAnimator(this, animatorSet, animationConfig)
+            provider.addConcealAnimator(this, animatorSet, inAnimationDuration, outAnimationDuration)
         }
     }
 
@@ -351,8 +294,8 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
         fun onConceal(backLayer: BackdropBackLayer, revealedView: View)
     }
     interface AnimatorProvider {
-        fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, animationConfig: AnimationConfig)
-        fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, animationConfig: AnimationConfig)
+        fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long)
+        fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long)
     }
 
     class LayoutParams : ViewGroup.LayoutParams {
@@ -364,81 +307,36 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
             const val DEFAULT_HEIGHT = ViewGroup.LayoutParams.MATCH_PARENT
             const val DEFAULT_CHILD_TYPE = CONTENT_CHILD_TYPE
             const val DEFAULT_HIDE_CONCEALED = true
+            const val DEFAULT_MIN_REVEALED_FRONT_VIEW_HEIGHT = 0
         }
 
         val childType : Int
         val shouldHideHeader: Boolean
+        val minRevealedFrontViewHeight: Int
 
         constructor() : this(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         constructor(width: Int, height: Int) : super(width, height) {
             this.childType = DEFAULT_CHILD_TYPE
             this.shouldHideHeader = DEFAULT_HIDE_CONCEALED
+            this.minRevealedFrontViewHeight = 0
         }
         constructor(source: ViewGroup.LayoutParams?) : super(source) {
             this.childType = DEFAULT_CHILD_TYPE
             this.shouldHideHeader = DEFAULT_HIDE_CONCEALED
+            this.minRevealedFrontViewHeight = 0
         }
         constructor(c: Context?, attrs: AttributeSet?) : super(c, attrs) {
             if (c == null || attrs == null) {
                 this.childType = DEFAULT_CHILD_TYPE
                 this.shouldHideHeader = DEFAULT_HIDE_CONCEALED
+                this.minRevealedFrontViewHeight = 0
             } else {
                 val typedArray = c.obtainStyledAttributes(attrs, R.styleable.BackdropBackLayer_Layout)
                 this.childType = typedArray.getInt(R.styleable.BackdropBackLayer_Layout_layout_childType, DEFAULT_CHILD_TYPE)
                 this.shouldHideHeader = typedArray.getBoolean(R.styleable.BackdropBackLayer_Layout_layout_hideHeaderOnReveal, DEFAULT_HIDE_CONCEALED)
+                this.minRevealedFrontViewHeight = 0
                 typedArray.recycle()
             }
-        }
-    }
-
-    class Behavior: CoordinatorLayout.Behavior<BackdropBackLayer> {
-        val minBottomOffset: Int
-        var lastInsets: WindowInsetsCompat? = null
-
-        constructor(minBottomOffset: Int) : super() {
-            this.minBottomOffset = minBottomOffset
-        }
-        constructor(context: Context, attrs: AttributeSet) : super(context, attrs) {
-            val a = context.obtainStyledAttributes(attrs, R.styleable.BackdropBackLayer_Behavior)
-
-            var minBottomOffsetVar = a.getLayoutDimension(R.styleable.BackdropBackLayer_Behavior_behavior_minFrontViewRevealedHeight, -1)
-            if (minBottomOffsetVar == -1) {
-                minBottomOffsetVar = context.resources.getDimensionPixelSize(R.dimen.default_min_front_layer_visible_height)
-            }
-            minBottomOffset = minBottomOffsetVar
-
-            a.recycle()
-        }
-
-//        override fun onApplyWindowInsets(
-//                coordinatorLayout: CoordinatorLayout,
-//                child: BackdropBackLayer,
-//                insets: WindowInsetsCompat
-//        ): WindowInsetsCompat {
-//            lastInsets = insets
-//            child.setPadding(
-//                    child.paddingLeft,
-//                    child.paddingTop + insets.systemWindowInsetTop,
-//                    child.paddingRight,
-//                    child.paddingBottom)
-//            return insets.consumeSystemWindowInsets()
-//        }
-
-        override fun onMeasureChild(
-                parent: CoordinatorLayout, child: BackdropBackLayer,
-                parentWidthMeasureSpec: Int, widthUsed: Int,
-                parentHeightMeasureSpec: Int, heightUsed: Int): Boolean {
-            val verticalInsets = lastInsets?.systemWindowInsetBottom ?: 0
-            parent.onMeasureChild(
-                    child,
-                    parentWidthMeasureSpec, widthUsed,
-                    parentHeightMeasureSpec, heightUsed + minBottomOffset + verticalInsets)
-            return true
-        }
-
-
-        private fun isBackdropFrontView(view: View): Boolean {
-            return view is BackdropFrontLayer
         }
     }
 
@@ -533,9 +431,6 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
             return true
         }
 
-
-
-
         override fun onInterceptTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
             return ((backLayer?.state == BackdropBackLayerState.REVEALED)
                     && isTouchInView(child, ev))
@@ -566,17 +461,17 @@ class BackdropBackLayer: ViewGroup, CoordinatorLayout.AttachedBehavior {
         open class AnimatorProvider<T: View>: BackdropBackLayer.AnimatorProvider {
             lateinit var frontLayer: T
 
-            override fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, animationConfig: AnimationConfig) {
+            override fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long) {
                 val offset = -backLayer.currentExtraHeight.toFloat()
                 val translateAnimator = ObjectAnimator.ofFloat(frontLayer, View.TRANSLATION_Y, frontLayer.translationY, offset)
-                translateAnimator.duration = animationConfig.totalDuration
+                translateAnimator.duration = inAnimationDuration + outAnimationDuration
                 animatorSet.play(translateAnimator)
             }
 
-            override fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, animationConfig: AnimationConfig) {
+            override fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long) {
                 val offset = -backLayer.currentExtraHeight.toFloat()
                 val translateAnimator = ObjectAnimator.ofFloat(frontLayer, View.TRANSLATION_Y, frontLayer.translationY, offset)
-                translateAnimator.duration = animationConfig.totalDuration
+                translateAnimator.duration = inAnimationDuration + outAnimationDuration
                 animatorSet.play(translateAnimator)
             }
         }

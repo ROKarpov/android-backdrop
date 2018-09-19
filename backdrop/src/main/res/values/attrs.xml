@@ -6,7 +6,7 @@
             <enum name="header" value="0x1"/>
         </attr>
         <attr name="layout_hideHeaderOnReveal" format="boolean"/>
-        <attr name="layout_scrimOnReveal" format="boolean"/>
+        <attr name="layout_minRevealedFrontViewHeight" format="dimension"/>
     </declare-styleable>
 
     <declare-styleable name="BackdropBackLayer_Behavior">
