@@ -29,7 +29,8 @@ internal enum class BackdropBackLayerState {
 
             if (withAnimation) {
                 val animatorSet = AnimatorSet()
-                val delay = interactionData.addRevealHeaderAnimations(animatorSet, backLayer.headerView)
+                val delay =
+                        interactionData.addRevealHeaderAnimations(animatorSet, backLayer.headerView)
                 val contentViewAnimationDuration =
                         interactionData.addRevealContentAnimations(animatorSet, viewToReveal, delay)
                 backLayer.addCustomRevealAnimators(animatorSet, contentViewAnimationDuration, delay)
@@ -79,9 +80,11 @@ internal enum class BackdropBackLayerState {
 
             if (withAnimation) {
                 val animatorSet = AnimatorSet()
-                val delay = interactionData.addConcealContentAnimations(animatorSet, viewToConceal)
-                val duration = interactionData.addConcealHeaderAnimations(animatorSet, backLayer.headerView, delay)
-                backLayer.addCustomConcealAnimators(animatorSet, duration, delay)
+                val outAnimationDuration =
+                        interactionData.addConcealContentAnimations(animatorSet, viewToConceal)
+                val inAnimationDuration =
+                        interactionData.addConcealHeaderAnimations(animatorSet, backLayer.headerView, outAnimationDuration)
+                backLayer.addCustomConcealAnimators(animatorSet, inAnimationDuration, outAnimationDuration)
 
                 val weakBackLayer = WeakReference(backLayer)
                 animatorSet.addListener(object : AnimatorListenerAdapter() {
@@ -132,7 +135,7 @@ internal enum class BackdropBackLayerState {
                 animatorSet.start()
             }
             else {
-                interactionData.reveal(viewToReveal, backLayer.headerView, prevView, prevInteractionData)
+                interactionData.reveal(viewToReveal, backLayer.headerView, prevView)
                 backLayer.notifyReveal(viewToReveal)
             }
             return true
