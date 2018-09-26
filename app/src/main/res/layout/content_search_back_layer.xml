@@ -9,31 +9,37 @@
     <ImageButton
         style="@style/Widget.AppCompat.Button.Borderless"
         android:id="@+id/search_view__close_btn"
-        android:contentDescription="123"
+        android:background="@drawable/btn_close_background"
+        android:contentDescription="@string/search_view_close_btn__description"
         app:srcCompat="@drawable/ic_close"
         android:layout_width="56dp"
         android:layout_height="56dp"
         android:layout_marginRight="4dp"
         android:layout_marginEnd="4dp"/>
 
-    <android.support.design.widget.TextInputLayout
+    <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/search_view__input_layout"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="56dp"
         android:layout_alignParentTop="true"
         android:layout_toEndOf="@id/search_view__close_btn"
         android:layout_toRightOf="@id/search_view__close_btn">
 
-        <android.support.design.widget.TextInputEditText
+        <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/search_view__input"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:drawableEnd="@drawable/ic_search"
             android:drawableRight="@drawable/ic_search"/>
-    </android.support.design.widget.TextInputLayout>
+    </com.google.android.material.textfield.TextInputLayout>
 
-    <android.support.v7.widget.RecyclerView
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/search_view__suggestions"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
+        android:paddingTop="0dp"
+        android:paddingBottom="0dp"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/search_view__input_layout"/>

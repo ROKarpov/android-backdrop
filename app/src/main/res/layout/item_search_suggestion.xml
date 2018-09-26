@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:gravity="center_vertical"
+    android:textColor="@android:color/white"
+
+    android:drawablePadding="@dimen/list_item_icon__horizontal_padding"
+    android:paddingTop="@dimen/list_item__vertical_padding"
+    android:paddingLeft="@dimen/list_item__horizontal_padding"
+    android:paddingBottom="@dimen/list_item__vertical_padding"
+    android:paddingRight="@dimen/list_item__horizontal_padding"
+
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/list_item__height_dense"/>

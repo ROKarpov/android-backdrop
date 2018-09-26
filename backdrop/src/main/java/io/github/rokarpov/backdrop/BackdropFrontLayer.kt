@@ -1,16 +1,12 @@
 package io.github.rokarpov.backdrop
 
-import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.annotation.TargetApi
 import android.content.Context
 import android.os.Build
-import android.support.design.widget.CoordinatorLayout
-import android.support.v4.widget.NestedScrollView
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout

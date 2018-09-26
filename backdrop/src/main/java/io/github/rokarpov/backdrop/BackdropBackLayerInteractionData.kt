@@ -111,6 +111,7 @@ class BackdropBackLayerInteractionData {
     internal fun getLayoutRevealedHeight(contentView: View, headerView: View): Int {
         return backViewStrategy.getContentViewVerticalOffset(headerView) + contentView.measuredHeight
     }
+    internal fun prepare(contentView: View) = actualContentProvider.prepare(contentView)
 
 
     internal fun addRevealHeaderAnimations(animatorSet: AnimatorSet, headerView: View): Long {
@@ -122,8 +123,12 @@ class BackdropBackLayerInteractionData {
             prevInteractionData: BackdropBackLayerInteractionData,
             view: View, prevDuration: Long
     ) {
-        backViewStrategy.addOnRevealHeaderViewAnimator(animatorSet, view, prevDuration, inAnimationDuration, prevInteractionData.backViewStrategy)
-
+        backViewStrategy.addOnRevealHeaderViewAnimator(
+                animatorSet,
+                view,
+                prevDuration,
+                inAnimationDuration,
+                prevInteractionData.backViewStrategy)
     }
     internal fun addConcealHeaderAnimations(animatorSet: AnimatorSet, view: View, delay: Long): Long {
         backViewStrategy.addOnConcealHeaderViewAnimator(animatorSet, view, delay, inAnimationDuration)
@@ -152,11 +157,16 @@ class BackdropBackLayerInteractionData {
     }
 
     interface ContentAnimatorProvider {
+        fun prepare(contentView: View)
         fun addOnRevealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long
         fun addOnConcealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long
     }
 
     private class DefaultContentAnimatorProvider: ContentAnimatorProvider {
+        override fun prepare(contentView: View) {
+            hideView(contentView)
+        }
+
         override fun addOnRevealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long {
             addShowAnimator(animatorSet, contentView, delay, duration)
             return duration

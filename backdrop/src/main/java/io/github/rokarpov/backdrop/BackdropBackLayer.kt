@@ -5,11 +5,12 @@ import android.annotation.TargetApi
 import android.content.Context
 import android.os.Build
 import android.os.Parcelable
-import android.support.design.widget.CoordinatorLayout
-import android.support.v4.view.GestureDetectorCompat
-import android.support.v4.view.ViewCompat
-import android.support.v4.view.WindowInsetsCompat
+import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.view.GestureDetectorCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import android.util.AttributeSet
+import android.util.Log
 import android.view.*
 import android.view.MotionEvent
 import java.lang.ref.WeakReference
@@ -76,11 +77,11 @@ class BackdropBackLayer: ViewGroup {
         return state.onConceal(this, viewToConceal, interactionData, withAnimation)
     }
 
-    fun updateChildState() {
-        for((view, _) in interactionData) {
-            BackdropBackLayerInteractionData.hideView(view)
+    fun prepare() {
+        for((view, data) in interactionData) {
+            data.prepare(view)
         }
-        state.onLayout(this);
+        state.onPrepare(this);
     }
 
     fun addBackdropListener(listener: Listener): Boolean {
@@ -99,8 +100,7 @@ class BackdropBackLayer: ViewGroup {
 
     // TODO: better return data through indexer.
     fun getInteractionData(view: View): BackdropBackLayerInteractionData {
-        val data = interactionData[view];
-        if (data == null)
+        val data = interactionData[view] ?:
             // TODO: Error message!
             throw IllegalArgumentException("")
         return data
@@ -340,7 +340,7 @@ class BackdropBackLayer: ViewGroup {
         }
     }
 
-    open class FrontLayerBehavior<T: View>: CoordinatorLayout.Behavior<T> {
+    open class FrontLayerBehavior<T: View>: androidx.coordinatorlayout.widget.CoordinatorLayout.Behavior<T> {
         private var indent: Int = 0
         private var lastInsets: WindowInsetsCompat? = null
 
@@ -370,7 +370,7 @@ class BackdropBackLayer: ViewGroup {
             gestureDetectorCompat = GestureDetectorCompat(context, FrontViewGestureListener(WeakReference(this)))
         }
 
-        override fun layoutDependsOn(parent: CoordinatorLayout, child: T, dependency: View): Boolean {
+        override fun layoutDependsOn(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, dependency: View): Boolean {
             if (dependency is BackdropBackLayer) {
                 backLayerListener.frontLayer = child
                 backLayer?.removeAnimatorProvider(backLayerListener)
@@ -381,7 +381,7 @@ class BackdropBackLayer: ViewGroup {
             return false
         }
 
-        override fun onDependentViewRemoved(parent: CoordinatorLayout, child: T, dependency: View) {
+        override fun onDependentViewRemoved(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, dependency: View) {
             super.onDependentViewRemoved(parent, child, dependency)
             if (dependency is BackdropBackLayer) {
                 dependency.removeAnimatorProvider(backLayerListener)
@@ -398,7 +398,7 @@ class BackdropBackLayer: ViewGroup {
 //            return insets.consumeSystemWindowInsets()
 //        }
 
-        override fun onDependentViewChanged(parent: CoordinatorLayout, child: T, dependency: View): Boolean {
+        override fun onDependentViewChanged(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, dependency: View): Boolean {
             super.onDependentViewChanged(parent, child, dependency)
             if (dependency is BackdropBackLayer) {
                 child.top = dependency.getConcealedHeight() + indent
@@ -408,11 +408,11 @@ class BackdropBackLayer: ViewGroup {
         }
 
         override fun onMeasureChild(
-                parent: CoordinatorLayout, child: T,
+                parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T,
                 parentWidthMeasureSpec: Int, widthUsed: Int,
                 parentHeightMeasureSpec: Int, heightUsed: Int
         ): Boolean {
-            val lp = child.layoutParams as? CoordinatorLayout.LayoutParams ?: return false
+            val lp = child.layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams ?: return false
             indent = lp.topMargin
             val headerBottom = backLayer?.getConcealedHeight() ?: 0
             val verticalInsets = lastInsets?.let{ it.systemWindowInsetTop + it.systemWindowInsetBottom } ?: 0
@@ -423,7 +423,7 @@ class BackdropBackLayer: ViewGroup {
             return true
         }
 
-        override fun onLayoutChild(parent: CoordinatorLayout, child: T, layoutDirection: Int): Boolean {
+        override fun onLayoutChild(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, layoutDirection: Int): Boolean {
             parent.onLayoutChild(child, layoutDirection)
             val headerBottom = backLayer?.getConcealedHeight() ?: 0
             val verticalInsets = lastInsets?.systemWindowInsetTop ?: 0
@@ -431,13 +431,15 @@ class BackdropBackLayer: ViewGroup {
             return true
         }
 
-        override fun onInterceptTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
-            return ((backLayer?.state == BackdropBackLayerState.REVEALED)
-                    && isTouchInView(child, ev))
+        override fun onInterceptTouchEvent(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
+            val result = (backLayer?.state == BackdropBackLayerState.REVEALED) && isTouchInView(child, ev)
+            Log.d("BackdropBackLayer:FrB", "Intercept: ${result}")
+            return result
         }
 
-        override fun onTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
+        override fun onTouchEvent(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
             val result = gestureDetectorCompat.onTouchEvent(ev)
+            Log.d("BackdropBackLayer:FrB", "On touch: ${result}")
             return result
         }
 

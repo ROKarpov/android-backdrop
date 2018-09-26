@@ -11,7 +11,7 @@ internal enum class BackdropBackLayerState {
         override fun getContentHeight(interactionData: BackdropBackLayerInteractionData?, contentView: View?, headerView: View): Int {
             return 0
         }
-        override fun onLayout(layout: BackdropBackLayer) { }
+        override fun onPrepare(layout: BackdropBackLayer) { }
 
         override fun onConceal(
                 backLayer: BackdropBackLayer,
@@ -61,7 +61,7 @@ internal enum class BackdropBackLayerState {
                 0
             }
         }
-        override fun onLayout(layout: BackdropBackLayer) {
+        override fun onPrepare(layout: BackdropBackLayer) {
             val view = layout.revealedView
             if (view != null) {
                 BackdropBackLayerInteractionData.showView(view)
@@ -143,7 +143,7 @@ internal enum class BackdropBackLayerState {
     };
 
     internal abstract fun getContentHeight(interactionData: BackdropBackLayerInteractionData?, contentView: View?, headerView: View): Int
-    internal abstract fun onLayout(layout: BackdropBackLayer)
+    internal abstract fun onPrepare(layout: BackdropBackLayer)
 
     internal abstract fun onConceal(
             backLayer: BackdropBackLayer,

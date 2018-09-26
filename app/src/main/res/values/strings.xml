@@ -11,4 +11,8 @@
     <string name="menu_navigation__two_views_title">Two Back Views</string>
     <string name="main__navigation_title">Navigation</string>
     <string name="main__tune_title">Filter</string>
+
+    <string name="item_search_suggestion__icon_content_description">Icon</string>
+
+    <string name="search_view_close_btn__description">Close button</string>
 </resources>
