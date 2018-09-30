@@ -5,20 +5,21 @@ import android.animation.ObjectAnimator
 import android.annotation.TargetApi
 import android.content.Context
 import android.os.Build
+import android.os.Parcel
+import android.os.Parcelable
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 
+const val MANY_HEADERS_MSG = ""
+const val MANY_CONTENT_VIEWS_MSG = ""
+const val CONCEALED_ALPHA = 1.0f
+const val REVEALED_ALPHA = 0.5f
+
 class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.AttachedBehavior {
     companion object {
-        val CONCEALED_ALPHA = 1.0f
-        val REVEALED_ALPHA = 0.5f
-
-        val MANY_HEADERS_MSG = ""
-        val MANY_CONTENT_VIEWS_MSG = ""
-
     }
 
     //private var contentViewsAlpha: Float = CONCEALED_ALPHA
@@ -193,6 +194,21 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         return LayoutParams()
     }
 
+    override fun onSaveInstanceState(): Parcelable {
+        var state = SavedState(super.onSaveInstanceState())
+        state.contentViewAlpha = contentView?.alpha ?: REVEALED_ALPHA
+        return state
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable) {
+        if (state !is SavedState) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+        super.onRestoreInstanceState(state.superState)
+        contentView?.alpha = state.contentViewAlpha
+    }
+
     override fun getBehavior(): CoordinatorLayout.Behavior<*> {
         return Behavior()
     }
@@ -209,6 +225,30 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
     }
     private fun isContentView(view: View): Boolean {
         return headerView != view
+    }
+
+    class SavedState: BaseSavedState {
+        companion object {
+            @JvmField val CREATOR = parcelableClassLoaderCreator(::SavedState, ::SavedState)
+        }
+        @JvmField var contentViewAlpha: Float
+
+        private constructor(source: Parcel) : super(source) {
+            contentViewAlpha = source.readFloat()
+        }
+        @TargetApi(Build.VERSION_CODES.N)
+        private constructor(source: Parcel, loader: ClassLoader) : super(source, loader) {
+            contentViewAlpha = source.readFloat()
+        }
+        constructor(superState: Parcelable) : super(superState) {
+            contentViewAlpha = CONCEALED_ALPHA
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeFloat(contentViewAlpha)
+        }
+
     }
 
     class LayoutParams: FrameLayout.LayoutParams {
@@ -252,7 +292,7 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
                 super.addRevealAnimator(backLayer, animatorSet, inAnimationDuration, outAnimationDuration)
 
                 val contentView = frontLayer.contentView ?: return
-                val translateAnimator = ObjectAnimator.ofFloat(contentView, View.ALPHA, contentView.alpha, BackdropFrontLayer.REVEALED_ALPHA)
+                val translateAnimator = ObjectAnimator.ofFloat(contentView, View.ALPHA, contentView.alpha, REVEALED_ALPHA)
                 translateAnimator.duration = inAnimationDuration + outAnimationDuration
                 animatorSet.play(translateAnimator)
             }
@@ -261,7 +301,7 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
                 super.addConcealAnimator(backLayer, animatorSet, inAnimationDuration, outAnimationDuration)
 
                 val contentView = frontLayer.contentView ?: return
-                val translateAnimator = ObjectAnimator.ofFloat(contentView, View.ALPHA, contentView.alpha, BackdropFrontLayer.CONCEALED_ALPHA)
+                val translateAnimator = ObjectAnimator.ofFloat(contentView, View.ALPHA, contentView.alpha, CONCEALED_ALPHA)
                 translateAnimator.duration = inAnimationDuration + outAnimationDuration
                 animatorSet.play(translateAnimator)
             }

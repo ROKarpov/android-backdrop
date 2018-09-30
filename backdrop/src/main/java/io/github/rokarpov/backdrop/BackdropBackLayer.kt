@@ -4,8 +4,8 @@ import android.animation.*
 import android.annotation.TargetApi
 import android.content.Context
 import android.os.Build
+import android.os.Parcel
 import android.os.Parcelable
-import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -51,9 +51,10 @@ class BackdropBackLayer: ViewGroup {
     constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int): super(context, attrs, defStyleAttr, defStyleRes) {
     }
 
-    fun revealBackView(id: Int): Boolean {
-        return revealBackView(id, true)
+    fun reveal(contentViewId: Int): Boolean {
+        return revealBackView(contentViewId, true)
     }
+    //fun revealWithoutAnimation(contentViewId: Int): Boolean { }
     fun revealBackView(id: Int, withAnimation: Boolean): Boolean {
         val viewToReveal = findViewById<View>(id)
         return revealBackView(viewToReveal, withAnimation)
@@ -62,7 +63,7 @@ class BackdropBackLayer: ViewGroup {
     fun revealBackView(viewToReveal: View): Boolean {
         return revealBackView(viewToReveal, true)
     }
-    fun revealBackView(viewToReveal: View, withAnimation: Boolean = true): Boolean {
+    fun revealBackView(viewToReveal: View, withAnimation: Boolean): Boolean {
         if (revealedView == viewToReveal) return false
         val interactionData = interactionData[viewToReveal] ?: return false
         return state.onReveal(this, viewToReveal, interactionData, withAnimation)
@@ -234,9 +235,20 @@ class BackdropBackLayer: ViewGroup {
         return p is LayoutParams
     }
 
-    // TODO: IMPLEMENT!
+    override fun onSaveInstanceState(): Parcelable {
+        val state = SavedState(super.onSaveInstanceState())
+        state.revealedViewId = revealedView?.id ?: EMPTY_ID
+        return state
+    }
+
     override fun onRestoreInstanceState(state: Parcelable) {
-        super.onRestoreInstanceState(state)
+        if (state !is SavedState) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+        super.onRestoreInstanceState(state.superState)
+        if (state.revealedViewId == EMPTY_ID) return
+        revealBackView(state.revealedViewId, false)
     }
 
     internal val currentExtraHeight: Int
@@ -340,6 +352,29 @@ class BackdropBackLayer: ViewGroup {
         }
     }
 
+    class SavedState: BaseSavedState {
+        companion object {
+            @JvmField val CREATOR = parcelableClassLoaderCreator(::SavedState, ::SavedState)
+        }
+
+        @JvmField var revealedViewId: Int
+
+        private constructor(source: Parcel) : super(source) {
+            revealedViewId = source.readInt()
+        }
+        @TargetApi(Build.VERSION_CODES.N)
+        private constructor(source: Parcel, loader: ClassLoader) : super(source, loader) {
+            revealedViewId = source.readInt()
+        }
+        constructor(superState: Parcelable) : super(superState) {
+            revealedViewId = EMPTY_ID
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeInt(revealedViewId)
+        }
+    }
     open class FrontLayerBehavior<T: View>: androidx.coordinatorlayout.widget.CoordinatorLayout.Behavior<T> {
         private var indent: Int = 0
         private var lastInsets: WindowInsetsCompat? = null
