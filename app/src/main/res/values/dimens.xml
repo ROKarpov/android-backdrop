@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="toolbar_height">56dp</dimen>
+    <dimen name="toolbar__height">56dp</dimen>
+    <dimen name="toolbar_icon__width">56dp</dimen>
+    <dimen name="toolbar_icon__marginEnd">4dp</dimen>
     <dimen name="front_layer_background__radius">16dp</dimen>
 
     <dimen name="list_item__height_dense">48dp</dimen>

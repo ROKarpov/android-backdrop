@@ -12,16 +12,16 @@
         android:background="@drawable/btn_close_background"
         android:contentDescription="@string/search_view_close_btn__description"
         app:srcCompat="@drawable/ic_close"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_marginRight="4dp"
-        android:layout_marginEnd="4dp"/>
+        android:layout_width="@dimen/toolbar_icon__width"
+        android:layout_height="@dimen/toolbar__height"
+        android:layout_marginRight="@dimen/toolbar_icon__marginEnd"
+        android:layout_marginEnd="@dimen/toolbar_icon__marginEnd"/>
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/search_view__input_layout"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/toolbar__height"
         android:layout_alignParentTop="true"
         android:layout_toEndOf="@id/search_view__close_btn"
         android:layout_toRightOf="@id/search_view__close_btn">
