@@ -113,20 +113,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     class SearchBackViewAnimatorProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider {
-        override fun prepare(contentView: View) {
-            BackdropBackLayerInteractionData.hideView(contentView)
+        override fun onPrepare(contentView: View) {
+            hideView(contentView)
             if (contentView !is SearchBackView) return
-            BackdropBackLayerInteractionData.hideView(contentView.input)
-            BackdropBackLayerInteractionData.hideView(contentView.suggestionList)
+            hideView(contentView.input)
+            hideView(contentView.suggestionList)
         }
 
         override fun addOnRevealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long {
             if (contentView !is SearchBackView) return 0
             contentView.closeButton.setImageResource(R.drawable.ic_close)
-            BackdropBackLayerInteractionData.showView(contentView)
+            showView(contentView)
 
-            BackdropBackLayerInteractionData.addShowAnimator(animatorSet, contentView.input, delay, duration)
-            BackdropBackLayerInteractionData.addShowAnimator(animatorSet, contentView.suggestionList, delay, duration)
+            addShowAnimator(animatorSet, contentView.input, delay, duration)
+            addShowAnimator(animatorSet, contentView.suggestionList, delay, duration)
 
             return duration
         }
@@ -135,9 +135,9 @@ class MainActivity : AppCompatActivity() {
             if (contentView !is SearchBackView) return 0
             contentView.closeButton.setImageResource(R.drawable.ic_hamburger)
 
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, contentView.input, delay, duration)
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, contentView.suggestionList, delay, duration)
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, contentView, delay + duration, duration)
+            addHideAnimator(animatorSet, contentView.input, delay, duration)
+            addHideAnimator(animatorSet, contentView.suggestionList, delay, duration)
+            addHideAnimator(animatorSet, contentView, delay + duration, duration)
             return duration
         }
     }

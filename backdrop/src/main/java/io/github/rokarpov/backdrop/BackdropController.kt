@@ -70,7 +70,7 @@ class BackdropController {
     }
 
     fun syncState() {
-        backLayer.prepare()
+        backLayer.onPrepare()
         when (backLayer.state) {
             BackdropBackLayerState.REVEALED -> {
                 val data = findDataByView(backLayer.revealedView) ?: return

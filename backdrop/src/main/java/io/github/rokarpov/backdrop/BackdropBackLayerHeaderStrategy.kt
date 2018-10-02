@@ -16,23 +16,23 @@ internal enum class  BackdropBackLayerHeaderStrategy {
 
         override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, prevViewDuration: Long, duration: Long, prevStrategy: BackdropBackLayerHeaderStrategy) {
             if (this == prevStrategy) return
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, headerView, 0, prevViewDuration)
+            addHideAnimator(animatorSet, headerView, 0, prevViewDuration)
         }
 
         override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, duration: Long) {
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, headerView, 0, duration)
+            addHideAnimator(animatorSet, headerView, 0, duration)
         }
 
         override fun addOnConcealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, delay: Long, duration: Long) {
-            BackdropBackLayerInteractionData.addShowAnimator(animatorSet, headerView, delay, duration)
+            addShowAnimator(animatorSet, headerView, delay, duration)
         }
 
         override fun updateHeaderOnReveal(headerView: View) {
-            BackdropBackLayerInteractionData.hideView(headerView)
+            hideView(headerView)
         }
 
         override fun updateHeaderOnConceal(headerView: View) {
-            BackdropBackLayerInteractionData.showView(headerView)
+            showView(headerView)
         }
     },
     DEFAULT{
@@ -50,7 +50,7 @@ internal enum class  BackdropBackLayerHeaderStrategy {
 
         override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, prevViewDuration: Long, duration: Long, prevStrategy: BackdropBackLayerHeaderStrategy) {
             if (this == prevStrategy) return
-            BackdropBackLayerInteractionData.addShowAnimator(animatorSet, headerView, prevViewDuration, duration)
+            addShowAnimator(animatorSet, headerView, prevViewDuration, duration)
         }
         override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, duration: Long) { }
         override fun addOnConcealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, delay: Long, duration: Long) { }
