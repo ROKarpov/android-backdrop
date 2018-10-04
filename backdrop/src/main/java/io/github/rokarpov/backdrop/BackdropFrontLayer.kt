@@ -13,21 +13,16 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 
-const val MANY_HEADERS_MSG = ""
-const val MANY_CONTENT_VIEWS_MSG = ""
-const val CONCEALED_ALPHA = 1.0f
-const val REVEALED_ALPHA = 0.5f
-
 class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.AttachedBehavior {
     companion object {
+        const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one view with \"layout_type\" set to \"header\"."
+        const val MANY_CONTENT_VIEWS_MSG = "The BackdropBackLayer must contain only one view with \"layout_type\" set to \"content\"."
+        const val CONCEALED_ALPHA = 1.0f
+        const val REVEALED_ALPHA = 0.5f
     }
-
-    //private var contentViewsAlpha: Float = CONCEALED_ALPHA
 
     private var headerView: View? = null
     private var contentView: View? = null
-    //private val contentViews: MutableList<View> = mutableListOf()
-    //private val matchedParentChildren: MutableList<View> = mutableListOf()
 
     constructor(context: Context) : this (context, null)
     constructor(context: Context, attrs: AttributeSet?): this (context, attrs, 0)
@@ -268,7 +263,7 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         }
         constructor(c: Context, attrs: AttributeSet) : super(c, attrs) {
             val array = c.obtainStyledAttributes(attrs, R.styleable.BackdropFrontLayer_Layout)
-            type = array.getInt(R.styleable.BackdropFrontLayer_Layout_layout_childType0, DEFAULT_TYPE)
+            type = array.getInt(R.styleable.BackdropFrontLayer_Layout_layout_childType, DEFAULT_TYPE)
             array.recycle()
         }
         constructor(source: ViewGroup.LayoutParams) : super(source) {

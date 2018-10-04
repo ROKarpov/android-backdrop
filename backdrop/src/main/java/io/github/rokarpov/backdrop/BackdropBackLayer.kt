@@ -10,15 +10,16 @@ import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.util.AttributeSet
-import android.util.Log
 import android.view.*
 import android.view.MotionEvent
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import java.lang.ref.WeakReference
 
 class BackdropBackLayer: ViewGroup {
     companion object {
         internal const val NO_HEADER_MSG = "The BackdropBackLayer must contain the Header view."
         internal const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one Header view."
+        internal const val NO_INTERACTION_DATA = "The passed view does not have the assigned interaction data."
 
         internal val DEFAULT_STATE = BackdropBackLayerState.CONCEALED
 
@@ -27,7 +28,6 @@ class BackdropBackLayer: ViewGroup {
         @JvmField var oneStepAnimationTime: Long = 263
     }
     private var isInLayoutState: Boolean = false
-    private var isAnimated: Boolean = false
     private var hasHeaderView: Boolean = false
     private val matchedParentChildren: MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
     private val interactionData : MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
@@ -39,8 +39,7 @@ class BackdropBackLayer: ViewGroup {
     @JvmField internal var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
     @JvmField internal var currentAnimator: Animator? = null
 
-    // TODO: Make listeners weak.
-    private val listeners: MutableList<Listener> = mutableListOf()
+    private val listeners: MutableList<WeakReference<Listener>> = mutableListOf()
     private val animatorProviders: MutableList<AnimatorProvider> = mutableListOf()
 
     constructor(context: Context): this(context, null)
@@ -78,18 +77,11 @@ class BackdropBackLayer: ViewGroup {
         return state.onConceal(this, viewToConceal, interactionData, withAnimation)
     }
 
-    fun prepare() {
-        for((view, data) in interactionData) {
-            data.prepare(view)
-        }
-        state.onPrepare(this);
-    }
-
     fun addBackdropListener(listener: Listener): Boolean {
-        return listeners.add(listener)
+        return listeners.add(WeakReference(listener))
     }
     fun removeBackdropListener(listener: Listener): Boolean {
-        return listeners.remove(listener)
+        return listeners.remove(WeakReference(listener))
     }
 
     fun addAnimatorProvider(provider: AnimatorProvider): Boolean {
@@ -99,12 +91,10 @@ class BackdropBackLayer: ViewGroup {
         return animatorProviders.remove(provider)
     }
 
-    // TODO: better return data through indexer.
     fun getInteractionData(view: View): BackdropBackLayerInteractionData {
-        val data = interactionData[view] ?:
-            // TODO: Error message!
-            throw IllegalArgumentException("")
-        return data
+        return interactionData[view] ?:
+            throw IllegalArgumentException(NO_INTERACTION_DATA)
+
     }
     fun getInteractionData(id: Int): BackdropBackLayerInteractionData {
         val view: View = findViewById(id)
@@ -151,7 +141,7 @@ class BackdropBackLayer: ViewGroup {
         for ((child, data) in interactionData) {
             if (child.visibility != View.GONE) {
                 measureContentView(child, widthMeasureMode, heightMeasureSpec, data.getContentViewVerticalOffset(headerView))
-                //measureChild(child, widthMeasureSpec, heightMeasureSpec)
+
                 val lp = child.layoutParams as LayoutParams
                 maxWidth = Math.max(maxWidth,
                         child.measuredWidth)
@@ -184,13 +174,13 @@ class BackdropBackLayer: ViewGroup {
             val lp = view.layoutParams
 
             val childWidthMeasureSpec = if (lp.width == ViewGroup.LayoutParams.MATCH_PARENT) {
-                val width = Math.max(0, getMeasuredWidth() - horizontalPadding)
+                val width = Math.max(0, measuredWidth - horizontalPadding)
                 MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY);
             } else {
                 getChildMeasureSpec(widthMeasureSpec, horizontalPadding, lp.width)
             }
             val childHeightMeasureSpec = if (lp.height == ViewGroup.LayoutParams.MATCH_PARENT) {
-                val height = Math.max(0, getMeasuredHeight() - verticalPadding - data.getContentViewVerticalOffset(headerView))
+                val height = Math.max(0, measuredHeight - verticalPadding - data.getContentViewVerticalOffset(headerView))
                 MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY);
             } else {
                 getChildMeasureSpec(heightMeasureSpec, verticalPadding, lp.height)
@@ -198,13 +188,18 @@ class BackdropBackLayer: ViewGroup {
             view.measure(childWidthMeasureSpec, childHeightMeasureSpec)
         }
     }
+    fun onPrepare() {
+        for ((child,data) in interactionData)
+            data.onPrepare(child)
+        state.onPrepare(this)
+    }
+
     override fun requestLayout() {
         if (!isInLayoutState) {
             super.requestLayout()
         }
     }
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        //if (!changed) return
         this.isInLayoutState = true
         val layoutLeft = paddingLeft
         val layoutTop = paddingTop
@@ -274,12 +269,12 @@ class BackdropBackLayer: ViewGroup {
 
     internal fun notifyReveal(revealedView: View) {
         for (listener in listeners) {
-            listener.onReveal(this, revealedView)
+            listener.get()?.onReveal(this, revealedView) ?: listeners.remove(listener)
         }
     }
     internal fun notifyConceal(revealedView: View) {
         for (listener in listeners) {
-            listener.onConceal(this, revealedView)
+            listener.get()?.onConceal(this, revealedView) ?: listeners.remove(listener)
         }
     }
 
@@ -375,52 +370,50 @@ class BackdropBackLayer: ViewGroup {
             out.writeInt(revealedViewId)
         }
     }
-    open class FrontLayerBehavior<T: View>: androidx.coordinatorlayout.widget.CoordinatorLayout.Behavior<T> {
+    open class FrontLayerBehavior<T: View>: CoordinatorLayout.Behavior<T> {
         private var indent: Int = 0
         private var lastInsets: WindowInsetsCompat? = null
 
         private var backLayer: BackdropBackLayer? = null
         protected open var backLayerListener = AnimatorProvider<T>()
+        private lateinit var frontViewOnClickStrategy: FrontLayerBehaviorOnClickStrategy
 
-        private val gestureDetectorCompat: GestureDetectorCompat
-        private var internalRevealedFrontClickCallback: WeakReference<RevealedFrontClickCallback>
-                = WeakReference<RevealedFrontClickCallback>(null)
-
-        var revealedFrontClickCallback: RevealedFrontClickCallback?
-            get() {
-                return internalRevealedFrontClickCallback.get()
-            }
-            set(value) {
-                internalRevealedFrontClickCallback  = if (value != null)
-                    WeakReference(value)
-                else
-                    WeakReference<RevealedFrontClickCallback>(null)
-            }
+        val concealOnClick: Boolean
+            get() { return frontViewOnClickStrategy is ConcealOnClickFrontLayerBehaviorOnClickStrategy }
 
         constructor() : super() {
-            gestureDetectorCompat = GestureDetectorCompat(null, FrontViewGestureListener(WeakReference(this)))
-
+            allowConcealOnClick()
         }
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs) {
-            gestureDetectorCompat = GestureDetectorCompat(context, FrontViewGestureListener(WeakReference(this)))
+            val typedArray = context.obtainStyledAttributes(attrs, R.styleable.BackdropBackLayer_FrontLayerBehavior)
+            var concealOnClick = typedArray.getBoolean(R.styleable.BackdropBackLayer_FrontLayerBehavior_behavior_concealOnClick, true)
+            if (concealOnClick) {
+                allowConcealOnClick()
+            } else {
+                disallowConcealOnClick()
+            }
+            typedArray.recycle()
         }
 
-        override fun layoutDependsOn(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, dependency: View): Boolean {
+        override fun layoutDependsOn(parent: CoordinatorLayout, child: T, dependency: View): Boolean {
             if (dependency is BackdropBackLayer) {
-                backLayerListener.frontLayer = child
                 backLayer?.removeAnimatorProvider(backLayerListener)
-                backLayer = dependency
+
+                backLayerListener.frontLayer = child
+                frontViewOnClickStrategy.setBackLayer(dependency)
                 dependency.addAnimatorProvider(backLayerListener)
+                backLayer = dependency
                 return true
             }
             return false
         }
 
-        override fun onDependentViewRemoved(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, dependency: View) {
+        override fun onDependentViewRemoved(parent: CoordinatorLayout, child: T, dependency: View) {
             super.onDependentViewRemoved(parent, child, dependency)
             if (dependency is BackdropBackLayer) {
-                dependency.removeAnimatorProvider(backLayerListener)
                 if (dependency == backLayer) {
+                    dependency.removeAnimatorProvider(backLayerListener)
+                    frontViewOnClickStrategy.setBackLayer(dependency)
                     backLayer = null
                 }
             }
@@ -433,7 +426,7 @@ class BackdropBackLayer: ViewGroup {
 //            return insets.consumeSystemWindowInsets()
 //        }
 
-        override fun onDependentViewChanged(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, dependency: View): Boolean {
+        override fun onDependentViewChanged(parent: CoordinatorLayout, child: T, dependency: View): Boolean {
             super.onDependentViewChanged(parent, child, dependency)
             if (dependency is BackdropBackLayer) {
                 child.top = dependency.getConcealedHeight() + indent
@@ -443,11 +436,11 @@ class BackdropBackLayer: ViewGroup {
         }
 
         override fun onMeasureChild(
-                parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T,
+                parent: CoordinatorLayout, child: T,
                 parentWidthMeasureSpec: Int, widthUsed: Int,
                 parentHeightMeasureSpec: Int, heightUsed: Int
         ): Boolean {
-            val lp = child.layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams ?: return false
+            val lp = child.layoutParams as? CoordinatorLayout.LayoutParams ?: return false
             indent = lp.topMargin
             val headerBottom = backLayer?.getConcealedHeight() ?: 0
             val verticalInsets = lastInsets?.let{ it.systemWindowInsetTop + it.systemWindowInsetBottom } ?: 0
@@ -458,7 +451,7 @@ class BackdropBackLayer: ViewGroup {
             return true
         }
 
-        override fun onLayoutChild(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, layoutDirection: Int): Boolean {
+        override fun onLayoutChild(parent: CoordinatorLayout, child: T, layoutDirection: Int): Boolean {
             parent.onLayoutChild(child, layoutDirection)
             val headerBottom = backLayer?.getConcealedHeight() ?: 0
             val verticalInsets = lastInsets?.systemWindowInsetTop ?: 0
@@ -466,33 +459,23 @@ class BackdropBackLayer: ViewGroup {
             return true
         }
 
-        override fun onInterceptTouchEvent(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
-            val result = (backLayer?.state == BackdropBackLayerState.REVEALED) && isTouchInView(child, ev)
-            Log.d("BackdropBackLayer:FrB", "Intercept: ${result}")
-            return result
+        override fun onInterceptTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
+            return frontViewOnClickStrategy.onInterceptTouchEvent(child, ev)
         }
 
-        override fun onTouchEvent(parent: androidx.coordinatorlayout.widget.CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
-            val result = gestureDetectorCompat.onTouchEvent(ev)
-            Log.d("BackdropBackLayer:FrB", "On touch: ${result}")
-            return result
+        override fun onTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
+            return frontViewOnClickStrategy.onTouchEvent(child, ev)
         }
 
-        private fun isTouchInView(view: T, e: MotionEvent): Boolean {
-            val top = view.top + view.translationY
-            val left = view.left + view.translationX
-            val bottom = view.bottom + view.translationY
-            val right = view.right + view.translationX
-
-            val x = e.x
-            val y = e.y
-
-            return ((y >= top) && (x >= left) && (y <= bottom) && (x <= right))
+        fun allowConcealOnClick() {
+            allowConcealOnClick(EmptyFrontLayerBehaviorOnClickCallback)
         }
-
-
-        interface RevealedFrontClickCallback {
-            fun onRevealedFrontViewClick()
+        fun allowConcealOnClick(callback: FrontLayerBehaviorOnClickCallback) {
+            frontViewOnClickStrategy = ConcealOnClickFrontLayerBehaviorOnClickStrategy(callback)
+            frontViewOnClickStrategy.setBackLayer(backLayer)
+        }
+        fun disallowConcealOnClick() {
+            frontViewOnClickStrategy = NotConcealOnClickFrontLayerBehaviorOnClickStrategy
         }
 
         open class AnimatorProvider<T: View>: BackdropBackLayer.AnimatorProvider {
@@ -512,32 +495,8 @@ class BackdropBackLayer: ViewGroup {
                 animatorSet.play(translateAnimator)
             }
         }
-
-        class FrontViewGestureListener<T: View>(
-                private var owner: WeakReference<FrontLayerBehavior<T>>
-        ): GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent?): Boolean {
-                return true
-            }
-
-            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-                val ownerInstance = owner.get() ?: return false
-                ownerInstance.backLayer?.concealBackView()
-
-                ownerInstance.internalRevealedFrontClickCallback
-                        .get()?.onRevealedFrontViewClick()
-                return true
-            }
-
-            override fun onSingleTapUp(e: MotionEvent?): Boolean {
-                val ownerInstance = owner.get() ?: return false
-                ownerInstance.backLayer?.concealBackView()
-                ownerInstance.internalRevealedFrontClickCallback
-                        .get()?.onRevealedFrontViewClick()
-                return true
-            }
-        }
     }
+
     class DefaultFrontLayerBehavior: FrontLayerBehavior<View> {
         constructor() : super()
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs)

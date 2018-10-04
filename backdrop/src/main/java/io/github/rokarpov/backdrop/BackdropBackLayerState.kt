@@ -63,9 +63,10 @@ internal enum class BackdropBackLayerState {
         }
         override fun onPrepare(layout: BackdropBackLayer) {
             val view = layout.revealedView
-            if (view != null) {
-                BackdropBackLayerInteractionData.showView(view)
-            }
+            val interactionData = layout.revealedViewInteractionData
+            if ((view == null) || (interactionData == null)) return
+
+            interactionData.reveal(view, layout.headerView)
         }
 
         override fun onConceal(

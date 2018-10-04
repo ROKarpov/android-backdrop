@@ -1,57 +1,11 @@
 package io.github.rokarpov.backdrop
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
 import android.view.View
-import android.view.animation.AccelerateInterpolator
-import android.view.animation.DecelerateInterpolator
 import java.lang.ref.WeakReference
 
 class BackdropBackLayerInteractionData {
     companion object {
-        private val ALPHA_VISIBLE = 1.0f
-        private val ALPHA_HIDDEN = 0.0f
-
-        fun showView(contentView: View) {
-            contentView.alpha = BackdropBackLayerInteractionData.ALPHA_VISIBLE
-            contentView.visibility = View.VISIBLE
-        }
-        fun hideView(contentView: View) {
-            contentView.alpha = BackdropBackLayerInteractionData.ALPHA_HIDDEN
-            contentView.visibility = View.INVISIBLE
-        }
-
-        fun addShowAnimator(
-                animatorSet: AnimatorSet,
-                view: View,
-                delay: Long,
-                duration: Long) {
-            view.visibility = View.VISIBLE
-            val animator = ObjectAnimator.ofFloat(view, View.ALPHA, view.alpha, ALPHA_VISIBLE)
-            animator.startDelay = delay
-            animator.duration = duration
-            animator.interpolator = DecelerateInterpolator()
-            animatorSet.play(animator)
-        }
-        fun addHideAnimator(
-                animatorSet: AnimatorSet,
-                view: View,
-                delay: Long,
-                duration: Long) {
-            val animator = ObjectAnimator.ofFloat(view, View.ALPHA, view.alpha, ALPHA_HIDDEN)
-            animator.startDelay = delay
-            animator.duration = duration
-            animator.interpolator = AccelerateInterpolator()
-            animator.addListener(object: AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator, isReverse: Boolean) {
-                    view.visibility = View.INVISIBLE
-                }
-            })
-            animatorSet.play(animator)
-        }
-
         private val defaultContentAnimatorProvider = DefaultContentAnimatorProvider()
     }
 
@@ -94,11 +48,11 @@ class BackdropBackLayerInteractionData {
         this.hideHeader = hideHeader
         this.revealedFrontViewHeight = revealedFrontViewHeight
         if (hideHeader) {
-            inAnimationDuration = BackdropBackLayer.oneStepAnimationTime
-            outAnimationDuration = BackdropBackLayer.oneStepAnimationTime
-        } else {
             inAnimationDuration = BackdropBackLayer.fadeInTime
             outAnimationDuration = BackdropBackLayer.fadeOutTime
+        } else {
+            inAnimationDuration = BackdropBackLayer.oneStepAnimationTime
+            outAnimationDuration = BackdropBackLayer.oneStepAnimationTime
         }
     }
 
@@ -111,28 +65,24 @@ class BackdropBackLayerInteractionData {
     internal fun getLayoutRevealedHeight(contentView: View, headerView: View): Int {
         return backViewStrategy.getContentViewVerticalOffset(headerView) + contentView.measuredHeight
     }
-    internal fun prepare(contentView: View) = actualContentProvider.prepare(contentView)
+    internal fun onPrepare(contentView: View) = actualContentProvider.onPrepare(contentView)
 
 
     internal fun addRevealHeaderAnimations(animatorSet: AnimatorSet, headerView: View): Long {
-        backViewStrategy.addOnRevealHeaderViewAnimator(animatorSet, headerView, outAnimationDuration)
-        return outAnimationDuration
+        return backViewStrategy.addOnRevealHeaderViewAnimator(animatorSet, headerView, outAnimationDuration)
     }
     internal fun addRevealHeaderAnimations(
             animatorSet: AnimatorSet,
             prevInteractionData: BackdropBackLayerInteractionData,
             view: View, prevDuration: Long
-    ) {
-        backViewStrategy.addOnRevealHeaderViewAnimator(
-                animatorSet,
-                view,
-                prevDuration,
-                inAnimationDuration,
+    ): Long {
+        return backViewStrategy.addOnRevealHeaderViewAnimator(
+                animatorSet, view,
+                prevDuration, inAnimationDuration,
                 prevInteractionData.backViewStrategy)
     }
     internal fun addConcealHeaderAnimations(animatorSet: AnimatorSet, view: View, delay: Long): Long {
-        backViewStrategy.addOnConcealHeaderViewAnimator(animatorSet, view, delay, inAnimationDuration)
-        return inAnimationDuration
+        return backViewStrategy.addOnConcealHeaderViewAnimator(animatorSet, view, delay, inAnimationDuration)
     }
 
     internal fun addRevealContentAnimations(animatorSet: AnimatorSet, view: View, delay: Long): Long {
@@ -157,13 +107,13 @@ class BackdropBackLayerInteractionData {
     }
 
     interface ContentAnimatorProvider {
-        fun prepare(contentView: View)
+        fun onPrepare(contentView: View)
         fun addOnRevealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long
         fun addOnConcealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long
     }
 
     private class DefaultContentAnimatorProvider: ContentAnimatorProvider {
-        override fun prepare(contentView: View) {
+        override fun onPrepare(contentView: View) {
             hideView(contentView)
         }
 
