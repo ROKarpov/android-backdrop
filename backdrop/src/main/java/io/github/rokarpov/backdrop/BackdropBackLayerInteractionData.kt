@@ -69,24 +69,20 @@ class BackdropBackLayerInteractionData {
 
 
     internal fun addRevealHeaderAnimations(animatorSet: AnimatorSet, headerView: View): Long {
-        backViewStrategy.addOnRevealHeaderViewAnimator(animatorSet, headerView, outAnimationDuration)
-        return outAnimationDuration
+        return backViewStrategy.addOnRevealHeaderViewAnimator(animatorSet, headerView, outAnimationDuration)
     }
     internal fun addRevealHeaderAnimations(
             animatorSet: AnimatorSet,
             prevInteractionData: BackdropBackLayerInteractionData,
             view: View, prevDuration: Long
-    ) {
-        backViewStrategy.addOnRevealHeaderViewAnimator(
-                animatorSet,
-                view,
-                prevDuration,
-                inAnimationDuration,
+    ): Long {
+        return backViewStrategy.addOnRevealHeaderViewAnimator(
+                animatorSet, view,
+                prevDuration, inAnimationDuration,
                 prevInteractionData.backViewStrategy)
     }
     internal fun addConcealHeaderAnimations(animatorSet: AnimatorSet, view: View, delay: Long): Long {
-        backViewStrategy.addOnConcealHeaderViewAnimator(animatorSet, view, delay, inAnimationDuration)
-        return inAnimationDuration
+        return backViewStrategy.addOnConcealHeaderViewAnimator(animatorSet, view, delay, inAnimationDuration)
     }
 
     internal fun addRevealContentAnimations(animatorSet: AnimatorSet, view: View, delay: Long): Long {
