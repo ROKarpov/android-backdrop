@@ -39,7 +39,7 @@
             android:layout_height="match_parent"
             app:layout_childType="content"
             app:layout_hideHeaderOnReveal="true"
-            app:layout_minRevealedFrontViewHeight="0dp"/>
+            app:layout_minRevealedFrontViewHeight="@dimen/subheader_height"/>
     </io.github.rokarpov.backdrop.BackdropBackLayer>
 
     <io.github.rokarpov.backdrop.BackdropFrontLayer

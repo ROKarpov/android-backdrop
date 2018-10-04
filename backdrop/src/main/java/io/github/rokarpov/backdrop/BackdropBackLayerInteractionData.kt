@@ -48,11 +48,11 @@ class BackdropBackLayerInteractionData {
         this.hideHeader = hideHeader
         this.revealedFrontViewHeight = revealedFrontViewHeight
         if (hideHeader) {
-            inAnimationDuration = BackdropBackLayer.oneStepAnimationTime
-            outAnimationDuration = BackdropBackLayer.oneStepAnimationTime
-        } else {
             inAnimationDuration = BackdropBackLayer.fadeInTime
             outAnimationDuration = BackdropBackLayer.fadeOutTime
+        } else {
+            inAnimationDuration = BackdropBackLayer.oneStepAnimationTime
+            outAnimationDuration = BackdropBackLayer.oneStepAnimationTime
         }
     }
 

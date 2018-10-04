@@ -39,8 +39,7 @@ class BackdropBackLayer: ViewGroup {
     @JvmField internal var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
     @JvmField internal var currentAnimator: Animator? = null
 
-    // TODO: Make listeners weak.
-    private val listeners: MutableList<Listener> = mutableListOf()
+    private val listeners: MutableList<WeakReference<Listener>> = mutableListOf()
     private val animatorProviders: MutableList<AnimatorProvider> = mutableListOf()
 
     constructor(context: Context): this(context, null)
@@ -79,10 +78,10 @@ class BackdropBackLayer: ViewGroup {
     }
 
     fun addBackdropListener(listener: Listener): Boolean {
-        return listeners.add(listener)
+        return listeners.add(WeakReference(listener))
     }
     fun removeBackdropListener(listener: Listener): Boolean {
-        return listeners.remove(listener)
+        return listeners.remove(WeakReference(listener))
     }
 
     fun addAnimatorProvider(provider: AnimatorProvider): Boolean {
@@ -270,12 +269,12 @@ class BackdropBackLayer: ViewGroup {
 
     internal fun notifyReveal(revealedView: View) {
         for (listener in listeners) {
-            listener.onReveal(this, revealedView)
+            listener.get()?.onReveal(this, revealedView) ?: listeners.remove(listener)
         }
     }
     internal fun notifyConceal(revealedView: View) {
         for (listener in listeners) {
-            listener.onConceal(this, revealedView)
+            listener.get()?.onConceal(this, revealedView) ?: listeners.remove(listener)
         }
     }
 
@@ -377,36 +376,33 @@ class BackdropBackLayer: ViewGroup {
 
         private var backLayer: BackdropBackLayer? = null
         protected open var backLayerListener = AnimatorProvider<T>()
+        private lateinit var frontViewOnClickStrategy: FrontLayerBehaviorOnClickStrategy
 
-        private val gestureDetectorCompat: GestureDetectorCompat
-        private var internalRevealedFrontClickCallback: WeakReference<RevealedFrontClickCallback>
-                = WeakReference<RevealedFrontClickCallback>(null)
-
-        var revealedFrontClickCallback: RevealedFrontClickCallback?
-            get() {
-                return internalRevealedFrontClickCallback.get()
-            }
-            set(value) {
-                internalRevealedFrontClickCallback  = if (value != null)
-                    WeakReference(value)
-                else
-                    WeakReference<RevealedFrontClickCallback>(null)
-            }
+        val concealOnClick: Boolean
+            get() { return frontViewOnClickStrategy is ConcealOnClickFrontLayerBehaviorOnClickStrategy }
 
         constructor() : super() {
-            gestureDetectorCompat = GestureDetectorCompat(null, FrontViewGestureListener(WeakReference(this)))
-
+            allowConcealOnClick()
         }
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs) {
-            gestureDetectorCompat = GestureDetectorCompat(context, FrontViewGestureListener(WeakReference(this)))
+            val typedArray = context.obtainStyledAttributes(attrs, R.styleable.BackdropBackLayer_FrontLayerBehavior)
+            var concealOnClick = typedArray.getBoolean(R.styleable.BackdropBackLayer_FrontLayerBehavior_behavior_concealOnClick, true)
+            if (concealOnClick) {
+                allowConcealOnClick()
+            } else {
+                disallowConcealOnClick()
+            }
+            typedArray.recycle()
         }
 
         override fun layoutDependsOn(parent: CoordinatorLayout, child: T, dependency: View): Boolean {
             if (dependency is BackdropBackLayer) {
-                backLayerListener.frontLayer = child
                 backLayer?.removeAnimatorProvider(backLayerListener)
-                backLayer = dependency
+
+                backLayerListener.frontLayer = child
+                frontViewOnClickStrategy.setBackLayer(dependency)
                 dependency.addAnimatorProvider(backLayerListener)
+                backLayer = dependency
                 return true
             }
             return false
@@ -415,8 +411,9 @@ class BackdropBackLayer: ViewGroup {
         override fun onDependentViewRemoved(parent: CoordinatorLayout, child: T, dependency: View) {
             super.onDependentViewRemoved(parent, child, dependency)
             if (dependency is BackdropBackLayer) {
-                dependency.removeAnimatorProvider(backLayerListener)
                 if (dependency == backLayer) {
+                    dependency.removeAnimatorProvider(backLayerListener)
+                    frontViewOnClickStrategy.setBackLayer(dependency)
                     backLayer = null
                 }
             }
@@ -463,28 +460,22 @@ class BackdropBackLayer: ViewGroup {
         }
 
         override fun onInterceptTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
-            return (backLayer?.state == BackdropBackLayerState.REVEALED) && isTouchInView(child, ev)
+            return frontViewOnClickStrategy.onInterceptTouchEvent(child, ev)
         }
 
         override fun onTouchEvent(parent: CoordinatorLayout, child: T, ev: MotionEvent): Boolean {
-            return gestureDetectorCompat.onTouchEvent(ev)
+            return frontViewOnClickStrategy.onTouchEvent(child, ev)
         }
 
-        private fun isTouchInView(view: T, e: MotionEvent): Boolean {
-            val top = view.top + view.translationY
-            val left = view.left + view.translationX
-            val bottom = view.bottom + view.translationY
-            val right = view.right + view.translationX
-
-            val x = e.x
-            val y = e.y
-
-            return ((y >= top) && (x >= left) && (y <= bottom) && (x <= right))
+        fun allowConcealOnClick() {
+            allowConcealOnClick(EmptyFrontLayerBehaviorOnClickCallback)
         }
-
-
-        interface RevealedFrontClickCallback {
-            fun onRevealedFrontViewClick()
+        fun allowConcealOnClick(callback: FrontLayerBehaviorOnClickCallback) {
+            frontViewOnClickStrategy = ConcealOnClickFrontLayerBehaviorOnClickStrategy(callback)
+            frontViewOnClickStrategy.setBackLayer(backLayer)
+        }
+        fun disallowConcealOnClick() {
+            frontViewOnClickStrategy = NotConcealOnClickFrontLayerBehaviorOnClickStrategy
         }
 
         open class AnimatorProvider<T: View>: BackdropBackLayer.AnimatorProvider {
@@ -504,32 +495,8 @@ class BackdropBackLayer: ViewGroup {
                 animatorSet.play(translateAnimator)
             }
         }
-
-        class FrontViewGestureListener<T: View>(
-                private var owner: WeakReference<FrontLayerBehavior<T>>
-        ): GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent?): Boolean {
-                return true
-            }
-
-            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-                val ownerInstance = owner.get() ?: return false
-                ownerInstance.backLayer?.concealBackView()
-
-                ownerInstance.internalRevealedFrontClickCallback
-                        .get()?.onRevealedFrontViewClick()
-                return true
-            }
-
-            override fun onSingleTapUp(e: MotionEvent?): Boolean {
-                val ownerInstance = owner.get() ?: return false
-                ownerInstance.backLayer?.concealBackView()
-                ownerInstance.internalRevealedFrontClickCallback
-                        .get()?.onRevealedFrontViewClick()
-                return true
-            }
-        }
     }
+
     class DefaultFrontLayerBehavior: FrontLayerBehavior<View> {
         constructor() : super()
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs)

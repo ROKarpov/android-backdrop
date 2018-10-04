@@ -11,8 +11,8 @@
         <attr name="layout_minRevealedFrontViewHeight" format="dimension"/>
     </declare-styleable>
 
-    <declare-styleable name="BackdropBackLayer_Behavior">
-        <attr name="behavior_minFrontViewRevealedHeight" format="dimension"/>
+    <declare-styleable name="BackdropBackLayer_FrontLayerBehavior">
+        <attr name="behavior_concealOnClick" format="boolean"/>
     </declare-styleable>
 
     <declare-styleable name="BackdropFrontLayer_Layout">
