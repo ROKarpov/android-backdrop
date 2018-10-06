@@ -19,6 +19,7 @@ class BackdropBackLayer: ViewGroup {
     companion object {
         internal const val NO_HEADER_MSG = "The BackdropBackLayer must contain the Header view."
         internal const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one Header view."
+        internal const val NO_INTERACTION_DATA_FOR_VIEW_MSG = "The Layer does not contain an InteractionData object for the specified view. This is possible due to the fact that the passed view is a header or is not a child of the layer."
 
         internal val DEFAULT_STATE = BackdropBackLayerState.CONCEALED
 
@@ -39,8 +40,7 @@ class BackdropBackLayer: ViewGroup {
     @JvmField internal var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
     @JvmField internal var currentAnimator: Animator? = null
 
-    // TODO: Make listeners weak.
-    private val listeners: MutableList<Listener> = mutableListOf()
+    private val listeners: MutableList<WeakReference<Listener>> = mutableListOf()
     private val animatorProviders: MutableList<AnimatorProvider> = mutableListOf()
 
     constructor(context: Context): this(context, null)
@@ -86,10 +86,19 @@ class BackdropBackLayer: ViewGroup {
     }
 
     fun addBackdropListener(listener: Listener): Boolean {
-        return listeners.add(listener)
+        return listeners.add(WeakReference(listener))
     }
     fun removeBackdropListener(listener: Listener): Boolean {
-        return listeners.remove(listener)
+        for (weakListener in listeners) {
+            when(weakListener.get()) {
+                null -> listeners.remove(weakListener)
+                listener -> {
+                    listeners.remove(weakListener)
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     fun addAnimatorProvider(provider: AnimatorProvider): Boolean {
@@ -99,12 +108,8 @@ class BackdropBackLayer: ViewGroup {
         return animatorProviders.remove(provider)
     }
 
-    // TODO: better return data through indexer.
     fun getInteractionData(view: View): BackdropBackLayerInteractionData {
-        val data = interactionData[view] ?:
-            // TODO: Error message!
-            throw IllegalArgumentException("")
-        return data
+        return interactionData[view] ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
     }
     fun getInteractionData(id: Int): BackdropBackLayerInteractionData {
         val view: View = findViewById(id)
@@ -274,12 +279,14 @@ class BackdropBackLayer: ViewGroup {
 
     internal fun notifyReveal(revealedView: View) {
         for (listener in listeners) {
-            listener.onReveal(this, revealedView)
+            listener.get()?.onReveal(this, revealedView)
+                    ?: listeners.remove(listener)
         }
     }
     internal fun notifyConceal(revealedView: View) {
         for (listener in listeners) {
-            listener.onConceal(this, revealedView)
+            listener.get()?.onConceal(this, revealedView)
+                    ?: listeners.remove(listener)
         }
     }
 

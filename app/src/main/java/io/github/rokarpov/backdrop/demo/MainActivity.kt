@@ -18,7 +18,6 @@ import io.github.rokarpov.backdrop.demo.viewmodels.SearchApiStub
 
 class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
-    private lateinit var backdropBackLayer: BackdropBackLayer
     private lateinit var searchView: SearchBackView
 
     private lateinit var backdropController: BackdropController
@@ -32,8 +31,6 @@ class MainActivity : AppCompatActivity() {
         searchView = this.findViewById(R.id.main__search_view)
         searchView.suggestions = SearchApiStub().getSuggestions("")
 
-        backdropBackLayer = this.findViewById(R.id.rootLayout)
-
         val toolbar = this.findViewById<Toolbar>(R.id.main__toolbar)
         this.setSupportActionBar(toolbar)
         this.supportActionBar?.let {
@@ -44,21 +41,25 @@ class MainActivity : AppCompatActivity() {
 
         backdropController = BackdropControllerBuilder()
                 .withActivity(this)
-                .withBackLayer(backdropBackLayer)
+                .withBackLayer(R.id.rootLayout)
                 .withFrontLayer(R.id.main__front_layer)
+                .withInteractionSettings(
+                        InteractionSettings(searchView)
+                                .withHideHeader(true)
+                                .withContentAnimationProvider(SearchBackViewAnimatorProvider())
+                                .withAnimationDurations(2000, 1000)
+                )
                 .withMappings(
                         Mapping().isNavigationMapping()
                                 .withContentView(navigationView)
                                 .withAppTitle(R.string.main__navigation_title),
                         Mapping().withMenuItem(R.id.menu_main__search)
                                 .withContentView(searchView)
-                                .withAppTitle("")
                         )
                 .withConcealedNavigationIcon(R.drawable.ic_hamburger)
                 .withRevealedNavigationIcon(R.drawable.ic_close)
                 .build()
 
-        backdropBackLayer.getInteractionData(searchView).contentAnimatorProvider = SearchBackViewAnimatorProvider()
 
         searchView.onCloseListener = object: SearchBackView.OnCloseListener {
             override fun onClose() {

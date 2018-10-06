@@ -8,15 +8,16 @@ import android.content.res.Resources
 import android.graphics.drawable.Drawable
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
-import android.view.GestureDetector
 import androidx.appcompat.app.ActionBar as SupportActionBar
 import androidx.appcompat.widget.Toolbar as SupportToolbar
 import android.view.MenuItem
-import android.view.MotionEvent
 import android.view.View
 import android.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import java.lang.ref.WeakReference
+
+const val EMPTY_ID: Int = -1
+const val DEFAULT_ANIMATION_DURATION: Long = -1
 
 class BackdropController {
     private val backLayer: BackdropBackLayer
@@ -178,6 +179,53 @@ class Mapping {
     }
 }
 
+class InteractionSettings {
+
+    internal val viewId: Int
+    internal val view: View?
+    private var animationProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider? = null
+    private var hideHeader: Boolean = false
+    private var inAnimationDuration: Long = DEFAULT_ANIMATION_DURATION
+    private var outAnimationDuration: Long = DEFAULT_ANIMATION_DURATION
+
+
+    constructor(viewId: Int) {
+        this.viewId = viewId
+        this.view = null
+    }
+    constructor(view: View) {
+        this.viewId = EMPTY_ID
+        this.view = view
+    }
+
+    fun withContentAnimationProvider(animationProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider):InteractionSettings {
+        this.animationProvider = animationProvider
+        return this
+    }
+    fun withHideHeader(hideHeader: Boolean):InteractionSettings {
+        this.hideHeader = hideHeader
+        return this
+    }
+    fun withAnimationDurations(inDuration: Long, outDuration: Long):InteractionSettings {
+        this.inAnimationDuration = inDuration
+        this.outAnimationDuration = outDuration
+        return this
+    }
+
+    internal fun assignTo(interactionData: BackdropBackLayerInteractionData) {
+        interactionData.hideHeader = hideHeader
+        if (animationProvider != null) {
+                interactionData.contentAnimatorProvider = animationProvider
+        }
+        if (inAnimationDuration != DEFAULT_ANIMATION_DURATION) {
+            interactionData.inAnimationDuration = inAnimationDuration
+        }
+        if (outAnimationDuration != DEFAULT_ANIMATION_DURATION) {
+            interactionData.outAnimationDuration = outAnimationDuration
+        }
+    }
+}
+
 interface UnmappedMenuItemClickedCallback {
     fun onMenuItemClicked(menuItem: MenuItem): Boolean
 }
@@ -243,8 +291,6 @@ private class SupportActionBarStrategy(
 
 internal class RevealData(val view: View, val title: CharSequence)
 
-const val EMPTY_ID: Int = -1
-
 class BackdropControllerBuilder {
     companion object {
         private const val NO_CONTEXT_MSG = "The builder should have the specified context. Use the withContext() or withActivity() method to do this."
@@ -252,7 +298,8 @@ class BackdropControllerBuilder {
         private const val NO_ACTIVITY_MSG = "The builder should have the specified activity. Use the withActivity() method."
         private const val TOOLBAR_NOT_FOUND_MSG = "The view under the specified toolbarId is not android.widget.Toolbar or android.support.v7.widget.Toolbar."
         private const val NO_DRAWABLE_MSG = "The drawable is not specified."
-        private const val NO_STRING_MSG = "The string is not specified."
+        private const val VIEW_IN_MAPPING_NOT_FOUND_MSG = "The Mapping does not contain a view and the Mapping's viewId is empty."
+        private const val NO_BACK_LAYER_MSG = "The BackLayer must be specified using the withBackLayer method."
     }
     private var context: Context? = null
     private var activity: Activity? = null
@@ -276,6 +323,7 @@ class BackdropControllerBuilder {
     private var concealedNavIcon: Drawable? = null
 
     private val mappings: MutableList<Mapping> = mutableListOf()
+    private val settings: MutableList<InteractionSettings> = mutableListOf()
 
     fun withContext(context: Context): BackdropControllerBuilder {
         this.context = context
@@ -397,9 +445,27 @@ class BackdropControllerBuilder {
         return this
     }
 
+    fun withInteractionSettings(vararg settings: InteractionSettings): BackdropControllerBuilder {
+        this.settings.clear()
+        this.settings.addAll(settings)
+        return this
+    }
+    fun withInteractionSettings(settings: Iterable<InteractionSettings>): BackdropControllerBuilder {
+        this.settings.clear()
+        this.settings.addAll(settings)
+        return this
+    }
+
     fun build(): BackdropController {
+        var backLayer = selectBackLayer()
+        for (s in settings) {
+            val contentView = selectView(s.view, s.viewId) ?: continue
+            val data = backLayer.getInteractionData(contentView)
+            s.assignTo(data)
+        }
+
         return BackdropController(
-                selectBackView(),
+                backLayer,
                 selectFrontView(),
                 createMenuIdToRevealDataMap(),
                 createAppBarStrategy(),
@@ -440,8 +506,8 @@ class BackdropControllerBuilder {
         }
         return menuIdToRevealDataMap
     }
-    private fun selectBackView(): BackdropBackLayer {
-        return this.backLayer ?: getView(this.backLayerId)
+    private fun selectBackLayer(): BackdropBackLayer {
+        return selectView(this.backLayer, this.backLayerId) ?: throw IllegalStateException(NO_BACK_LAYER_MSG)
     }
     private fun selectFrontView(): View? {
         return when {
@@ -450,6 +516,10 @@ class BackdropControllerBuilder {
             else -> null
         }
     }
+    private fun <T: View> selectView(view: T?, viewId: Int): T? {
+        return view ?: getView(viewId)
+    }
+
     private fun selectConcealedNavIconDrawable() : Drawable {
         return selectDrawable(this.concealedNavIcon, this.concealedNavIconId, getResources(), getTheme())
     }
@@ -460,12 +530,13 @@ class BackdropControllerBuilder {
     private fun addRevealData(
             menuIdToRevealDataMap: MutableMap<Int, RevealData>,
             dataSource: Mapping, resources: Resources) {
-        val view = dataSource.view ?: getView(dataSource.viewId)
+        val view = dataSource.view ?: getView(dataSource.viewId) ?: throw IllegalStateException(VIEW_IN_MAPPING_NOT_FOUND_MSG)
         val title = selectString(dataSource.title, dataSource.titleId, resources)
         menuIdToRevealDataMap[dataSource.menuItemId] = RevealData(view, title)
     }
 
-    private fun <T: View> getView(id: Int): T {
+    private fun <T: View> getView(id: Int): T? {
+        if (id == EMPTY_ID) return null
         val activity = this.activity
         val appCompatActivity = this.appCompatActivity
         return when {
@@ -509,7 +580,7 @@ class BackdropControllerBuilder {
         return when {
             string != null -> string
             stringId!= EMPTY_ID -> resources.getString(stringId)
-            else -> throw IllegalStateException(NO_STRING_MSG)
+            else -> ""
         }
     }
     private fun selectDrawable(drawable: Drawable?, drawableId: Int, resources: Resources, theme: Resources.Theme) : Drawable {

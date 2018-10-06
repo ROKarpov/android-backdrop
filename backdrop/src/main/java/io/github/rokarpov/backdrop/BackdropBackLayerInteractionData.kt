@@ -15,11 +15,11 @@ class BackdropBackLayerInteractionData {
         private val ALPHA_HIDDEN = 0.0f
 
         fun showView(contentView: View) {
-            contentView.alpha = BackdropBackLayerInteractionData.ALPHA_VISIBLE
+            contentView.alpha = ALPHA_VISIBLE
             contentView.visibility = View.VISIBLE
         }
         fun hideView(contentView: View) {
-            contentView.alpha = BackdropBackLayerInteractionData.ALPHA_HIDDEN
+            contentView.alpha = ALPHA_HIDDEN
             contentView.visibility = View.INVISIBLE
         }
 
