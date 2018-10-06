@@ -2,7 +2,6 @@ package io.github.rokarpov.backdrop
 
 import android.os.Parcel
 import android.os.Parcelable
-import android.view.View
 
 inline fun <reified T> parcelableCreator(
         crossinline ctor: (Parcel) -> T
