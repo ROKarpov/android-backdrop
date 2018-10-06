@@ -53,7 +53,7 @@ class BackdropController {
             if (lp is CoordinatorLayout.LayoutParams) {
                 val behavior = lp.behavior
                 if (behavior is BackdropBackLayer.FrontLayerBehavior) {
-                    behavior.revealedFrontClickCallback = RevealedFrontViewCallback(WeakReference(this))
+                    behavior.allowConcealOnClick(RevealedFrontViewCallback(this))
                 }
             }
         }
@@ -71,7 +71,7 @@ class BackdropController {
     }
 
     fun syncState() {
-        backLayer.prepare()
+        backLayer.onPrepare()
         when (backLayer.state) {
             BackdropBackLayerState.REVEALED -> {
                 val data = findDataByView(backLayer.revealedView) ?: return
@@ -112,14 +112,13 @@ class BackdropController {
         return null
     }
 
-    private class RevealedFrontViewCallback(
-            private val owner: WeakReference<BackdropController>
-    ): BackdropBackLayer.FrontLayerBehavior.RevealedFrontClickCallback {
+    class RevealedFrontViewCallback(controller: BackdropController): FrontLayerBehaviorOnClickCallback {
+        val owner = WeakReference<BackdropController>(controller)
+
         override fun onRevealedFrontViewClick() {
-            val ownerInstance = owner.get()
-            if (ownerInstance != null) {
-                ownerInstance.appBarStrategy.updateContent(ownerInstance.defaultAppBarTitle, ownerInstance.defaultNavIcon)
-                ownerInstance.isBackdropRevealed = false
+            owner.get()?.let {
+                it.appBarStrategy.updateContent(it.defaultAppBarTitle, it.defaultNavIcon)
+                it.isBackdropRevealed = false
             }
         }
     }

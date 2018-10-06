@@ -14,25 +14,38 @@ internal enum class  BackdropBackLayerHeaderStrategy {
             contentView.layout(left, top, left + contentView.measuredWidth, top + contentView.measuredHeight)
         }
 
-        override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, prevViewDuration: Long, duration: Long, prevStrategy: BackdropBackLayerHeaderStrategy) {
-            if (this == prevStrategy) return
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, headerView, 0, prevViewDuration)
+        override fun addOnRevealHeaderViewAnimator(
+                animatorSet: AnimatorSet, headerView: View,
+                prevViewDuration: Long, duration: Long,
+                prevStrategy: BackdropBackLayerHeaderStrategy
+        ): Long {
+            if (this == prevStrategy) return 0
+            addHideAnimator(animatorSet, headerView, 0, prevViewDuration)
+            return  prevViewDuration
         }
 
-        override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, duration: Long) {
-            BackdropBackLayerInteractionData.addHideAnimator(animatorSet, headerView, 0, duration)
+        override fun addOnRevealHeaderViewAnimator(
+                animatorSet: AnimatorSet, headerView: View,
+                duration: Long
+        ): Long {
+            addHideAnimator(animatorSet, headerView, 0, duration)
+            return duration
         }
 
-        override fun addOnConcealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, delay: Long, duration: Long) {
-            BackdropBackLayerInteractionData.addShowAnimator(animatorSet, headerView, delay, duration)
+        override fun addOnConcealHeaderViewAnimator(
+                animatorSet: AnimatorSet, headerView: View,
+                delay: Long, duration: Long
+        ): Long {
+            addShowAnimator(animatorSet, headerView, delay, duration)
+            return duration
         }
 
         override fun updateHeaderOnReveal(headerView: View) {
-            BackdropBackLayerInteractionData.hideView(headerView)
+            hideView(headerView)
         }
 
         override fun updateHeaderOnConceal(headerView: View) {
-            BackdropBackLayerInteractionData.showView(headerView)
+            showView(headerView)
         }
     },
     DEFAULT{
@@ -48,12 +61,23 @@ internal enum class  BackdropBackLayerHeaderStrategy {
             contentView.layout(left, viewTop, viewRight, viewBottom)
         }
 
-        override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, prevViewDuration: Long, duration: Long, prevStrategy: BackdropBackLayerHeaderStrategy) {
-            if (this == prevStrategy) return
-            BackdropBackLayerInteractionData.addShowAnimator(animatorSet, headerView, prevViewDuration, duration)
+        override fun addOnRevealHeaderViewAnimator(
+                animatorSet: AnimatorSet, headerView: View,
+                prevViewDuration: Long, duration: Long,
+                prevStrategy: BackdropBackLayerHeaderStrategy
+        ): Long {
+            if (this == prevStrategy) return 0
+            addShowAnimator(animatorSet, headerView, prevViewDuration, duration)
+            return prevViewDuration
         }
-        override fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, duration: Long) { }
-        override fun addOnConcealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, delay: Long, duration: Long) { }
+        override fun addOnRevealHeaderViewAnimator(
+                animatorSet: AnimatorSet, headerView: View,
+                duration: Long
+        ): Long = 0
+        override fun addOnConcealHeaderViewAnimator(
+                animatorSet: AnimatorSet, headerView: View,
+                delay: Long, duration: Long
+        ): Long = 0
     };
 
     abstract fun getContentViewVerticalOffset(defaultBackView: View): Int
@@ -62,10 +86,21 @@ internal enum class  BackdropBackLayerHeaderStrategy {
             contentView: View, headerView: View)
 
 
-    abstract fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, prevViewDuration: Long, duration: Long, prevStrategy: BackdropBackLayerHeaderStrategy)
-    abstract fun addOnRevealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, duration: Long)
-    abstract fun addOnConcealHeaderViewAnimator(animatorSet: AnimatorSet, headerView: View, delay: Long, duration: Long)
+    abstract fun addOnRevealHeaderViewAnimator(
+            animatorSet: AnimatorSet, headerView: View,
+            prevViewDuration: Long, duration: Long,
+            prevStrategy: BackdropBackLayerHeaderStrategy
+    ): Long
 
+    abstract fun addOnRevealHeaderViewAnimator(
+            animatorSet: AnimatorSet, headerView: View,
+            duration: Long
+    ): Long
+
+    abstract fun addOnConcealHeaderViewAnimator(
+            animatorSet: AnimatorSet, headerView: View,
+            delay: Long, duration: Long
+    ): Long
 
     open fun updateHeaderOnReveal(headerView: View) { }
     open fun updateHeaderOnConceal(headerView: View) { }
