@@ -19,7 +19,7 @@ class BackdropBackLayer: ViewGroup {
     companion object {
         internal const val NO_HEADER_MSG = "The BackdropBackLayer must contain the Header view."
         internal const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one Header view."
-        internal const val NO_INTERACTION_DATA = "The passed view does not have the assigned interaction data."
+        internal const val NO_INTERACTION_DATA_FOR_VIEW_MSG = "The Layer does not contain an InteractionData object for the specified view. This is possible due to the fact that the passed view is a header or is not a child of the layer."
 
         internal val DEFAULT_STATE = BackdropBackLayerState.CONCEALED
 
@@ -81,7 +81,16 @@ class BackdropBackLayer: ViewGroup {
         return listeners.add(WeakReference(listener))
     }
     fun removeBackdropListener(listener: Listener): Boolean {
-        return listeners.remove(WeakReference(listener))
+        for (weakListener in listeners) {
+            when(weakListener.get()) {
+                null -> listeners.remove(weakListener)
+                listener -> {
+                    listeners.remove(weakListener)
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     fun addAnimatorProvider(provider: AnimatorProvider): Boolean {
@@ -92,9 +101,7 @@ class BackdropBackLayer: ViewGroup {
     }
 
     fun getInteractionData(view: View): BackdropBackLayerInteractionData {
-        return interactionData[view] ?:
-            throw IllegalArgumentException(NO_INTERACTION_DATA)
-
+        return interactionData[view] ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
     }
     fun getInteractionData(id: Int): BackdropBackLayerInteractionData {
         val view: View = findViewById(id)
