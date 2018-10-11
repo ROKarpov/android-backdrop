@@ -15,6 +15,7 @@ inline fun showView(contentView: View) {
     contentView.alpha = ALPHA_VISIBLE
     contentView.visibility = View.VISIBLE
 }
+
 inline fun hideView(contentView: View) {
     contentView.alpha = ALPHA_HIDDEN
     contentView.visibility = View.INVISIBLE
@@ -32,6 +33,7 @@ inline fun addShowAnimator(
     animator.interpolator = DecelerateInterpolator()
     animatorSet.play(animator)
 }
+
 inline fun addHideAnimator(
         animatorSet: AnimatorSet,
         view: View,
@@ -41,7 +43,7 @@ inline fun addHideAnimator(
     animator.startDelay = delay
     animator.duration = duration
     animator.interpolator = AccelerateInterpolator()
-    animator.addListener(object: AnimatorListenerAdapter() {
+    animator.addListener(object : AnimatorListenerAdapter() {
         override fun onAnimationEnd(animation: Animator, isReverse: Boolean) {
             view.visibility = View.INVISIBLE
         }

@@ -1,6 +1,5 @@
 package io.github.rokarpov.backdrop.demo
 
-import android.animation.AnimatorSet
 import android.content.Context
 import android.os.Bundle
 import com.google.android.material.navigation.NavigationView
@@ -8,13 +7,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.widget.Toolbar
-import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import io.github.rokarpov.backdrop.*
 import android.view.inputmethod.InputMethodManager
 import io.github.rokarpov.backdrop.demo.viewmodels.SearchApiStub
-
 
 class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
@@ -32,34 +29,26 @@ class MainActivity : AppCompatActivity() {
         searchView.suggestions = SearchApiStub().getSuggestions("")
 
         val toolbar = this.findViewById<Toolbar>(R.id.main__toolbar)
-        this.setSupportActionBar(toolbar)
-        this.supportActionBar?.let {
-            it.setDisplayHomeAsUpEnabled(true)
-            it.setHomeButtonEnabled(true)
-            it.setHomeAsUpIndicator(R.drawable.ic_hamburger)
+        toolbar.title = title
+        toolbar.inflateMenu(R.menu.menu_main)
+
+        val backLayer = findViewById<BackdropBackLayer>(R.id.rootLayout)
+
+        backdropController = BackdropController.build(backLayer, applicationContext) {
+            supportToolbar = toolbar
+            frontLayer = findViewById(R.id.main__front_layer)
+            navigationIconSettings(navigationView) {
+                titleId = R.string.main__navigation_title
+            }
+            menuItemRevealSettings(R.id.menu_main__search, searchView)
+            interationSettings(searchView) {
+                hideHeader = true
+                animationProvider = SearchBackView.AnimatorProvider
+            }
+            concealedTitleId = R.string.app_name
+            concealedNavigationIconId = R.drawable.ic_hamburger
+            revealedNavigationIconId = R.drawable.ic_close
         }
-
-        backdropController = BackdropControllerBuilder()
-                .withActivity(this)
-                .withBackLayer(R.id.rootLayout)
-                .withFrontLayer(R.id.main__front_layer)
-                .withInteractionSettings(
-                        InteractionSettings(searchView)
-                                .withHideHeader(true)
-                                .withContentAnimationProvider(SearchBackViewAnimatorProvider())
-                                .withAnimationDurations(2000, 1000)
-                )
-                .withMappings(
-                        Mapping().isNavigationMapping()
-                                .withContentView(navigationView)
-                                .withAppTitle(R.string.main__navigation_title),
-                        Mapping().withMenuItem(R.id.menu_main__search)
-                                .withContentView(searchView)
-                        )
-                .withConcealedNavigationIcon(R.drawable.ic_hamburger)
-                .withRevealedNavigationIcon(R.drawable.ic_close)
-                .build()
-
 
         searchView.onCloseListener = object: SearchBackView.OnCloseListener {
             override fun onClose() {
@@ -83,22 +72,6 @@ class MainActivity : AppCompatActivity() {
         backdropController.syncState()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        this.menuInflater.inflate(R.menu.menu_main, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (backdropController.onOptionsItemSelected(item)) {
-            if (item.itemId == R.id.menu_main__search) {
-                showKeyboard(searchView.input)
-            }
-            return true
-        }
-
-        return super.onOptionsItemSelected(item)
-    }
-
     override fun onBackPressed() {
         backdropController.conceal()
     }
@@ -111,35 +84,5 @@ class MainActivity : AppCompatActivity() {
     fun hideKeyboard(view: View) {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(view.windowToken, 0)
-    }
-
-    class SearchBackViewAnimatorProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider {
-        override fun onPrepare(contentView: View) {
-            hideView(contentView)
-            if (contentView !is SearchBackView) return
-            hideView(contentView.input)
-            hideView(contentView.suggestionList)
-        }
-
-        override fun addOnRevealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long {
-            if (contentView !is SearchBackView) return 0
-            contentView.closeButton.setImageResource(R.drawable.ic_close)
-            showView(contentView)
-
-            addShowAnimator(animatorSet, contentView.input, delay, duration)
-            addShowAnimator(animatorSet, contentView.suggestionList, delay, duration)
-
-            return duration
-        }
-
-        override fun addOnConcealAnimators(contentView: View, animatorSet: AnimatorSet, delay: Long, duration: Long): Long {
-            if (contentView !is SearchBackView) return 0
-            contentView.closeButton.setImageResource(R.drawable.ic_hamburger)
-
-            addHideAnimator(animatorSet, contentView.input, delay, duration)
-            addHideAnimator(animatorSet, contentView.suggestionList, delay, duration)
-            addHideAnimator(animatorSet, contentView, delay + duration, duration)
-            return duration
-        }
     }
 }

@@ -11,7 +11,8 @@ internal enum class BackdropBackLayerState {
         override fun getContentHeight(interactionData: BackdropBackLayerInteractionData?, contentView: View?, headerView: View): Int {
             return 0
         }
-        override fun onPrepare(layout: BackdropBackLayer) { }
+
+        override fun onPrepare(layout: BackdropBackLayer) {}
 
         override fun onConceal(
                 backLayer: BackdropBackLayer,
@@ -19,6 +20,7 @@ internal enum class BackdropBackLayerState {
                 withAnimation: Boolean): Boolean {
             return true
         }
+
         override fun onReveal(backLayer: BackdropBackLayer,
                               viewToReveal: View, interactionData: BackdropBackLayerInteractionData,
                               withAnimation: Boolean): Boolean {
@@ -45,8 +47,7 @@ internal enum class BackdropBackLayerState {
                 })
                 backLayer.currentAnimator = animatorSet
                 animatorSet.start()
-            }
-            else {
+            } else {
                 interactionData.reveal(viewToReveal, backLayer.headerView)
                 backLayer.notifyReveal(viewToReveal)
             }
@@ -61,6 +62,7 @@ internal enum class BackdropBackLayerState {
                 0
             }
         }
+
         override fun onPrepare(layout: BackdropBackLayer) {
             val view = layout.revealedView
             val interactionData = layout.revealedViewInteractionData
@@ -104,6 +106,7 @@ internal enum class BackdropBackLayerState {
             }
             return true
         }
+
         override fun onReveal(
                 backLayer: BackdropBackLayer,
                 viewToReveal: View, interactionData: BackdropBackLayerInteractionData,
@@ -134,8 +137,7 @@ internal enum class BackdropBackLayerState {
                 })
                 backLayer.currentAnimator = animatorSet
                 animatorSet.start()
-            }
-            else {
+            } else {
                 interactionData.reveal(viewToReveal, backLayer.headerView, prevView)
                 backLayer.notifyReveal(viewToReveal)
             }
@@ -150,6 +152,7 @@ internal enum class BackdropBackLayerState {
             backLayer: BackdropBackLayer,
             viewToConceal: View, interactionData: BackdropBackLayerInteractionData,
             withAnimation: Boolean): Boolean
+
     internal abstract fun onReveal(
             backLayer: BackdropBackLayer,
             viewToReveal: View, interactionData: BackdropBackLayerInteractionData,
