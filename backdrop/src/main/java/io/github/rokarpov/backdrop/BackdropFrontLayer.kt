@@ -13,7 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 
-class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.AttachedBehavior {
+class BackdropFrontLayer : FrameLayout/*NestedScrollView*/, CoordinatorLayout.AttachedBehavior {
     companion object {
         const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one view with \"layout_type\" set to \"header\"."
         const val MANY_CONTENT_VIEWS_MSG = "The BackdropBackLayer must contain only one view with \"layout_type\" set to \"content\"."
@@ -24,14 +24,14 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
     private var headerView: View? = null
     private var contentView: View? = null
 
-    constructor(context: Context) : this (context, null)
-    constructor(context: Context, attrs: AttributeSet?): this (context, attrs, 0)
-    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int): super(context, attrs, defStyleAttr) {
+    constructor(context: Context) : this(context, null)
+    constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
+    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr) {
         init(context, attrs, defStyleAttr, 0)
     }
 
     @TargetApi(Build.VERSION_CODES.M)
-    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int): super(context, attrs, defStyleAttr) {
+    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int) : super(context, attrs, defStyleAttr) {
         init(context, attrs, defStyleAttr, defStyleRes)
     }
 
@@ -65,8 +65,6 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         // TODO: MODIFY TO ALLOW ONLY TWO CHILDREN!
         val widthMeasureMode = MeasureSpec.getMode(widthMeasureSpec)
         val heightMeasureMode = MeasureSpec.getMode(heightMeasureSpec)
-        val width = MeasureSpec.getSize(widthMeasureSpec)
-        val height = MeasureSpec.getSize(heightMeasureSpec)
 
         val measureMatchParentChildren = (widthMeasureMode != MeasureSpec.EXACTLY) || (heightMeasureMode != MeasureSpec.EXACTLY)
 
@@ -155,7 +153,7 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
     override fun addView(child: View, index: Int, params: ViewGroup.LayoutParams) {
         super.addView(child, index, params)
         if (params is LayoutParams)
-            when(params.type) {
+            when (params.type) {
                 LayoutParams.CONTENT_TYPE -> {
                     if (contentView != null) {
                         throw IllegalStateException(MANY_CONTENT_VIEWS_MSG)
@@ -218,23 +216,29 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         val childHeightHeightSpec = getChildMeasureSpec(heightMeasureSpec, paddingTop + paddingBottom + offset, lp.height)
         view.measure(childWidthMeasureSpec, childHeightHeightSpec)
     }
+
     private fun isContentView(view: View): Boolean {
         return headerView != view
     }
 
-    class SavedState: BaseSavedState {
+    class SavedState : BaseSavedState {
         companion object {
-            @JvmField val CREATOR = parcelableClassLoaderCreator(::SavedState, ::SavedState)
+            @JvmField
+            val CREATOR = parcelableClassLoaderCreator(::SavedState, ::SavedState)
         }
-        @JvmField var contentViewAlpha: Float
+
+        @JvmField
+        var contentViewAlpha: Float
 
         private constructor(source: Parcel) : super(source) {
             contentViewAlpha = source.readFloat()
         }
+
         @TargetApi(Build.VERSION_CODES.N)
         private constructor(source: Parcel, loader: ClassLoader) : super(source, loader) {
             contentViewAlpha = source.readFloat()
         }
+
         constructor(superState: Parcelable) : super(superState) {
             contentViewAlpha = CONCEALED_ALPHA
         }
@@ -246,7 +250,7 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
 
     }
 
-    class LayoutParams: FrameLayout.LayoutParams {
+    class LayoutParams : FrameLayout.LayoutParams {
         companion object {
             val CONTENT_TYPE: Int = 0
             val SUBHEADER_TYPE: Int = 1
@@ -255,17 +259,20 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
             val DEFAULT_WIDHT = ViewGroup.LayoutParams.MATCH_PARENT
             val DEFAULT_HEIGHT = ViewGroup.LayoutParams.MATCH_PARENT
         }
+
         val type: Int
 
 
         constructor(width: Int = DEFAULT_WIDHT, height: Int = DEFAULT_HEIGHT, type: Int = DEFAULT_TYPE) : super(width, height) {
             this.type = type
         }
+
         constructor(c: Context, attrs: AttributeSet) : super(c, attrs) {
             val array = c.obtainStyledAttributes(attrs, R.styleable.BackdropFrontLayer_Layout)
             type = array.getInt(R.styleable.BackdropFrontLayer_Layout_layout_childType, DEFAULT_TYPE)
             array.recycle()
         }
+
         constructor(source: ViewGroup.LayoutParams) : super(source) {
             if (source is LayoutParams) {
                 type = source.type
@@ -275,14 +282,13 @@ class BackdropFrontLayer: FrameLayout/*NestedScrollView*/, CoordinatorLayout.Att
         }
     }
 
-    class Behavior: BackdropBackLayer.FrontLayerBehavior<BackdropFrontLayer> {
-        override var backLayerListener: BackdropBackLayer.FrontLayerBehavior.AnimatorProvider<BackdropFrontLayer>
-                = AnimatorProvider()
+    class Behavior : BackdropBackLayer.FrontLayerBehavior<BackdropFrontLayer> {
+        override var animatorProvider: BackdropBackLayer.FrontLayerBehavior.AnimatorProvider<BackdropFrontLayer> = AnimatorProvider()
 
         constructor() : super()
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-        class AnimatorProvider: BackdropBackLayer.FrontLayerBehavior.AnimatorProvider<BackdropFrontLayer>() {
+        class AnimatorProvider : BackdropBackLayer.FrontLayerBehavior.AnimatorProvider<BackdropFrontLayer>() {
             override fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long) {
                 super.addRevealAnimator(backLayer, animatorSet, inAnimationDuration, outAnimationDuration)
 

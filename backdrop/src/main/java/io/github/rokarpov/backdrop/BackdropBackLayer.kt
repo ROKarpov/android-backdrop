@@ -6,16 +6,14 @@ import android.content.Context
 import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
-import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.util.AttributeSet
 import android.view.*
 import android.view.MotionEvent
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import java.lang.ref.WeakReference
 
-class BackdropBackLayer: ViewGroup {
+class BackdropBackLayer : ViewGroup {
     companion object {
         internal const val NO_HEADER_MSG = "The BackdropBackLayer must contain the Header view."
         internal const val MANY_HEADERS_MSG = "The BackdropBackLayer must contain only one Header view."
@@ -23,36 +21,46 @@ class BackdropBackLayer: ViewGroup {
 
         internal val DEFAULT_STATE = BackdropBackLayerState.CONCEALED
 
-        @JvmField var fadeOutTime: Long = 100 // First step
-        @JvmField var fadeInTime: Long = 200 // Second step
-        @JvmField var oneStepAnimationTime: Long = 263
+        @JvmField
+        var fadeOutTime: Long = 100
+        @JvmField
+        var fadeInTime: Long = 200
+        @JvmField
+        var oneStepAnimationTime: Long = 263
     }
+
     private var isInLayoutState: Boolean = false
     private var hasHeaderView: Boolean = false
     private val matchedParentChildren: MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
-    private val interactionData : MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
+    private val interactionData: MutableMap<View, BackdropBackLayerInteractionData> = mutableMapOf()
 
-    @JvmField internal var state: BackdropBackLayerState = DEFAULT_STATE
+    @JvmField
+    internal var state: BackdropBackLayerState = DEFAULT_STATE
 
     internal lateinit var headerView: View
-    @JvmField internal var revealedView: View? = null
-    @JvmField internal var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
-    @JvmField internal var currentAnimator: Animator? = null
+    @JvmField
+    internal var revealedView: View? = null
+    @JvmField
+    internal var revealedViewInteractionData: BackdropBackLayerInteractionData? = null
+    @JvmField
+    internal var currentAnimator: Animator? = null
 
-    private val listeners: MutableList<WeakReference<Listener>> = mutableListOf()
+    private val listeners: MutableList<Listener> = mutableListOf()
     private val animatorProviders: MutableList<AnimatorProvider> = mutableListOf()
 
-    constructor(context: Context): this(context, null)
-    constructor(context: Context, attrs: AttributeSet?): this(context, attrs, 0)
-    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int): super(context, attrs, defStyleAttr) {
+    constructor(context: Context) : this(context, null)
+    constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
+    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr) {
     }
+
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int): super(context, attrs, defStyleAttr, defStyleRes) {
+    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int) : super(context, attrs, defStyleAttr, defStyleRes) {
     }
 
     fun reveal(contentViewId: Int): Boolean {
         return revealBackView(contentViewId, true)
     }
+
     //fun revealWithoutAnimation(contentViewId: Int): Boolean { }
     fun revealBackView(id: Int, withAnimation: Boolean): Boolean {
         val viewToReveal = findViewById<View>(id)
@@ -62,6 +70,7 @@ class BackdropBackLayer: ViewGroup {
     fun revealBackView(viewToReveal: View): Boolean {
         return revealBackView(viewToReveal, true)
     }
+
     fun revealBackView(viewToReveal: View, withAnimation: Boolean): Boolean {
         if (revealedView == viewToReveal) return false
         val interactionData = interactionData[viewToReveal] ?: return false
@@ -71,49 +80,30 @@ class BackdropBackLayer: ViewGroup {
     fun concealBackView(): Boolean {
         return concealBackView(true)
     }
+
     fun concealBackView(withAnimation: Boolean): Boolean {
         val viewToConceal = revealedView ?: return false
         val interactionData = revealedViewInteractionData ?: return false
         return state.onConceal(this, viewToConceal, interactionData, withAnimation)
     }
 
-    fun addBackdropListener(listener: Listener): Boolean {
-        return listeners.add(WeakReference(listener))
-    }
-    fun removeBackdropListener(listener: Listener): Boolean {
-        for (weakListener in listeners) {
-            when(weakListener.get()) {
-                null -> listeners.remove(weakListener)
-                listener -> {
-                    listeners.remove(weakListener)
-                    return true
-                }
-            }
-        }
-        return false
-    }
+    fun addBackdropListener(listener: Listener): Boolean = listeners.add(listener)
+    fun removeBackdropListener(listener: Listener): Boolean = listeners.remove(listener)
 
-    fun addAnimatorProvider(provider: AnimatorProvider): Boolean {
-        return animatorProviders.add(provider)
-    }
-    fun removeAnimatorProvider(provider: AnimatorProvider): Boolean {
-        return animatorProviders.remove(provider)
-    }
+    fun addAnimatorProvider(provider: AnimatorProvider): Boolean = animatorProviders.add(provider)
+    fun removeAnimatorProvider(provider: AnimatorProvider): Boolean = animatorProviders.remove(provider)
 
-    fun getInteractionData(view: View): BackdropBackLayerInteractionData {
-        return interactionData[view] ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
-    }
-    fun getInteractionData(id: Int): BackdropBackLayerInteractionData {
-        val view: View = findViewById(id)
-        return getInteractionData(view)
-    }
+    fun getInteractionData(id: Int): BackdropBackLayerInteractionData = getInteractionData(findViewById<View>(id))
+    fun getInteractionData(view: View): BackdropBackLayerInteractionData
+            = interactionData[view]
+                ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
 
     override fun addView(child: View, index: Int, params: ViewGroup.LayoutParams) {
         super.addView(child, index, params)
         // To use the navigation view correctly:
         ViewCompat.setZ(child, 0.0f)
         if (params is LayoutParams)
-            when(params.childType) {
+            when (params.childType) {
                 LayoutParams.CONTENT_CHILD_TYPE -> {
                     val data = BackdropBackLayerInteractionData(this, params.shouldHideHeader)
                     interactionData[child] = data
@@ -195,8 +185,9 @@ class BackdropBackLayer: ViewGroup {
             view.measure(childWidthMeasureSpec, childHeightMeasureSpec)
         }
     }
+
     fun onPrepare() {
-        for ((child,data) in interactionData)
+        for ((child, data) in interactionData)
             data.onPrepare(child)
         state.onPrepare(this)
     }
@@ -206,6 +197,7 @@ class BackdropBackLayer: ViewGroup {
             super.requestLayout()
         }
     }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         this.isInLayoutState = true
         val layoutLeft = paddingLeft
@@ -218,7 +210,7 @@ class BackdropBackLayer: ViewGroup {
                 layoutTop,
                 layoutLeft + headerView.measuredWidth,
                 layoutTop + headerView.measuredHeight)
-        for((view, data) in interactionData) {
+        for ((view, data) in interactionData) {
             data.onLayoutRevealedView(view, headerView, layoutLeft, layoutTop, layoutRight, layoutBottom)
         }
         this.isInLayoutState = false
@@ -227,12 +219,15 @@ class BackdropBackLayer: ViewGroup {
     override fun generateDefaultLayoutParams(): LayoutParams {
         return LayoutParams()
     }
+
     override fun generateLayoutParams(attrs: AttributeSet): LayoutParams {
         return LayoutParams(context, attrs)
     }
+
     override fun generateLayoutParams(lp: ViewGroup.LayoutParams): LayoutParams {
         return LayoutParams(lp)
     }
+
     override fun checkLayoutParams(p: ViewGroup.LayoutParams): Boolean {
         return p is LayoutParams
     }
@@ -276,13 +271,28 @@ class BackdropBackLayer: ViewGroup {
 
     internal fun notifyReveal(revealedView: View) {
         for (listener in listeners) {
-            listener.get()?.onReveal(this, revealedView) ?: listeners.remove(listener)
+            listener.onReveal(this, revealedView)
         }
     }
+
+    internal fun notifyBeforeReveal(revealedView: View) : Boolean {
+        for (listener in listeners) {
+            return listener.onBeforeReveal(this, revealedView)
+        }
+        return true
+    }
+
     internal fun notifyConceal(revealedView: View) {
         for (listener in listeners) {
-            listener.get()?.onConceal(this, revealedView) ?: listeners.remove(listener)
+            listener.onConceal(this, revealedView)
         }
+    }
+
+    internal fun notifyBeforeConceal(revealedView: View) : Boolean {
+        for (listener in listeners) {
+            listener.onBeforeConceal(this, revealedView)
+        }
+        return true
     }
 
     internal fun addCustomRevealAnimators(animatorSet: AnimatorSet,
@@ -292,6 +302,7 @@ class BackdropBackLayer: ViewGroup {
             provider.addRevealAnimator(this, animatorSet, inAnimationDuration, outAnimationDuration)
         }
     }
+
     internal fun addCustomConcealAnimators(animatorSet: AnimatorSet,
                                            inAnimationDuration: Long,
                                            outAnimationDuration: Long) {
@@ -301,12 +312,13 @@ class BackdropBackLayer: ViewGroup {
     }
 
     interface Listener {
-        fun onRevealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long)
+        fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean
         fun onReveal(backLayer: BackdropBackLayer, revealedView: View)
 
-        fun onConcealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long)
+        fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View): Boolean
         fun onConceal(backLayer: BackdropBackLayer, revealedView: View)
     }
+
     interface AnimatorProvider {
         fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long)
         fun addConcealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long)
@@ -324,7 +336,7 @@ class BackdropBackLayer: ViewGroup {
             const val DEFAULT_MIN_REVEALED_FRONT_VIEW_HEIGHT = 0
         }
 
-        val childType : Int
+        val childType: Int
         val shouldHideHeader: Boolean
         val minRevealedFrontViewHeight: Int
 
@@ -334,11 +346,13 @@ class BackdropBackLayer: ViewGroup {
             this.shouldHideHeader = DEFAULT_HIDE_CONCEALED
             this.minRevealedFrontViewHeight = 0
         }
+
         constructor(source: ViewGroup.LayoutParams?) : super(source) {
             this.childType = DEFAULT_CHILD_TYPE
             this.shouldHideHeader = DEFAULT_HIDE_CONCEALED
             this.minRevealedFrontViewHeight = 0
         }
+
         constructor(c: Context?, attrs: AttributeSet?) : super(c, attrs) {
             if (c == null || attrs == null) {
                 this.childType = DEFAULT_CHILD_TYPE
@@ -354,20 +368,24 @@ class BackdropBackLayer: ViewGroup {
         }
     }
 
-    class SavedState: BaseSavedState {
+    class SavedState : BaseSavedState {
         companion object {
-            @JvmField val CREATOR = parcelableClassLoaderCreator(::SavedState, ::SavedState)
+            @JvmField
+            val CREATOR = parcelableClassLoaderCreator(::SavedState, ::SavedState)
         }
 
-        @JvmField var revealedViewId: Int
+        @JvmField
+        var revealedViewId: Int
 
         private constructor(source: Parcel) : super(source) {
             revealedViewId = source.readInt()
         }
+
         @TargetApi(Build.VERSION_CODES.N)
         private constructor(source: Parcel, loader: ClassLoader) : super(source, loader) {
             revealedViewId = source.readInt()
         }
+
         constructor(superState: Parcelable) : super(superState) {
             revealedViewId = EMPTY_ID
         }
@@ -377,20 +395,22 @@ class BackdropBackLayer: ViewGroup {
             out.writeInt(revealedViewId)
         }
     }
-    open class FrontLayerBehavior<T: View>: CoordinatorLayout.Behavior<T> {
+
+    open class FrontLayerBehavior<T : View> : CoordinatorLayout.Behavior<T>, FrontLayerClickListener {
         private var indent: Int = 0
         private var lastInsets: WindowInsetsCompat? = null
 
         private var backLayer: BackdropBackLayer? = null
-        protected open var backLayerListener = AnimatorProvider<T>()
+        protected open var animatorProvider = AnimatorProvider<T>()
         private lateinit var frontViewOnClickStrategy: FrontLayerBehaviorOnClickStrategy
 
-        val concealOnClick: Boolean
-            get() { return frontViewOnClickStrategy is ConcealOnClickFrontLayerBehaviorOnClickStrategy }
+        override val concealOnClick: Boolean
+            get() = frontViewOnClickStrategy is ConcealOnClickFrontLayerBehaviorOnClickStrategy
 
         constructor() : super() {
             allowConcealOnClick()
         }
+
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs) {
             val typedArray = context.obtainStyledAttributes(attrs, R.styleable.BackdropBackLayer_FrontLayerBehavior)
             var concealOnClick = typedArray.getBoolean(R.styleable.BackdropBackLayer_FrontLayerBehavior_behavior_concealOnClick, true)
@@ -404,11 +424,11 @@ class BackdropBackLayer: ViewGroup {
 
         override fun layoutDependsOn(parent: CoordinatorLayout, child: T, dependency: View): Boolean {
             if (dependency is BackdropBackLayer) {
-                backLayer?.removeAnimatorProvider(backLayerListener)
+                backLayer?.removeAnimatorProvider(animatorProvider)
 
-                backLayerListener.frontLayer = child
+                animatorProvider.frontLayer = child
                 frontViewOnClickStrategy.setBackLayer(dependency)
-                dependency.addAnimatorProvider(backLayerListener)
+                dependency.addAnimatorProvider(animatorProvider)
                 backLayer = dependency
                 return true
             }
@@ -419,7 +439,7 @@ class BackdropBackLayer: ViewGroup {
             super.onDependentViewRemoved(parent, child, dependency)
             if (dependency is BackdropBackLayer) {
                 if (dependency == backLayer) {
-                    dependency.removeAnimatorProvider(backLayerListener)
+                    dependency.removeAnimatorProvider(animatorProvider)
                     frontViewOnClickStrategy.setBackLayer(dependency)
                     backLayer = null
                 }
@@ -450,7 +470,8 @@ class BackdropBackLayer: ViewGroup {
             val lp = child.layoutParams as? CoordinatorLayout.LayoutParams ?: return false
             indent = lp.topMargin
             val headerBottom = backLayer?.getConcealedHeight() ?: 0
-            val verticalInsets = lastInsets?.let{ it.systemWindowInsetTop + it.systemWindowInsetBottom } ?: 0
+            val verticalInsets = lastInsets?.let { it.systemWindowInsetTop + it.systemWindowInsetBottom }
+                    ?: 0
             parent.onMeasureChild(
                     child,
                     parentWidthMeasureSpec, widthUsed,
@@ -474,18 +495,20 @@ class BackdropBackLayer: ViewGroup {
             return frontViewOnClickStrategy.onTouchEvent(child, ev)
         }
 
-        fun allowConcealOnClick() {
-            allowConcealOnClick(EmptyFrontLayerBehaviorOnClickCallback)
+        override fun allowConcealOnClick() {
+            allowConcealOnClick(EmptyFrontLayerClickCallback)
         }
-        fun allowConcealOnClick(callback: FrontLayerBehaviorOnClickCallback) {
+
+        override fun allowConcealOnClick(callback: FrontLayerClickCallback) {
             frontViewOnClickStrategy = ConcealOnClickFrontLayerBehaviorOnClickStrategy(callback)
             frontViewOnClickStrategy.setBackLayer(backLayer)
         }
-        fun disallowConcealOnClick() {
+
+        override fun disallowConcealOnClick() {
             frontViewOnClickStrategy = NotConcealOnClickFrontLayerBehaviorOnClickStrategy
         }
 
-        open class AnimatorProvider<T: View>: BackdropBackLayer.AnimatorProvider {
+        open class AnimatorProvider<T : View> : BackdropBackLayer.AnimatorProvider {
             lateinit var frontLayer: T
 
             override fun addRevealAnimator(backLayer: BackdropBackLayer, animatorSet: AnimatorSet, inAnimationDuration: Long, outAnimationDuration: Long) {
@@ -504,16 +527,16 @@ class BackdropBackLayer: ViewGroup {
         }
     }
 
-    class DefaultFrontLayerBehavior: FrontLayerBehavior<View> {
+    class DefaultFrontLayerBehavior : FrontLayerBehavior<View> {
         constructor() : super()
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
     }
 
-    open class SimpleBackdropListener: Listener {
-        override fun onRevealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long) { }
-        override fun onReveal(backLayer: BackdropBackLayer, revealedView: View) { }
+    open class SimpleBackdropListener : Listener {
+        override fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean = false
+        override fun onReveal(backLayer: BackdropBackLayer, revealedView: View) {}
 
-        override fun onConcealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long) { }
-        override fun onConceal(backLayer: BackdropBackLayer, revealedView: View) { }
+        override fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View): Boolean = false
+        override fun onConceal(backLayer: BackdropBackLayer, revealedView: View) {}
     }
 }

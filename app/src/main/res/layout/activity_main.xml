@@ -47,6 +47,7 @@
         android:background="@drawable/front_view_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        app:layout_behavior="@string/backdrop_front_layer_behavior"
         android:paddingStart="16dp"
         android:paddingLeft="16dp"
         android:paddingEnd="16dp"

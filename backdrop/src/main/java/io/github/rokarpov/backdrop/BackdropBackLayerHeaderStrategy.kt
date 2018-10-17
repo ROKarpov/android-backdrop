@@ -3,11 +3,12 @@ package io.github.rokarpov.backdrop
 import android.animation.*
 import android.view.View
 
-internal enum class  BackdropBackLayerHeaderStrategy {
-    HIDE_HEADER{
+internal enum class BackdropBackLayerHeaderStrategy {
+    HIDE_HEADER {
         override fun getContentViewVerticalOffset(defaultBackView: View): Int {
             return 0;
         }
+
         override fun onLayoutBackView(
                 left: Int, top: Int, right: Int, bottom: Int,
                 contentView: View, headerView: View) {
@@ -21,7 +22,7 @@ internal enum class  BackdropBackLayerHeaderStrategy {
         ): Long {
             if (this == prevStrategy) return 0
             addHideAnimator(animatorSet, headerView, 0, prevViewDuration)
-            return  prevViewDuration
+            return prevViewDuration
         }
 
         override fun addOnRevealHeaderViewAnimator(
@@ -48,10 +49,11 @@ internal enum class  BackdropBackLayerHeaderStrategy {
             showView(headerView)
         }
     },
-    DEFAULT{
+    DEFAULT {
         override fun getContentViewVerticalOffset(defaultBackView: View): Int {
             return defaultBackView.measuredHeight
         }
+
         override fun onLayoutBackView(
                 left: Int, top: Int, right: Int, bottom: Int,
                 contentView: View, headerView: View) {
@@ -70,10 +72,12 @@ internal enum class  BackdropBackLayerHeaderStrategy {
             addShowAnimator(animatorSet, headerView, prevViewDuration, duration)
             return prevViewDuration
         }
+
         override fun addOnRevealHeaderViewAnimator(
                 animatorSet: AnimatorSet, headerView: View,
                 duration: Long
         ): Long = 0
+
         override fun addOnConcealHeaderViewAnimator(
                 animatorSet: AnimatorSet, headerView: View,
                 delay: Long, duration: Long
@@ -102,7 +106,7 @@ internal enum class  BackdropBackLayerHeaderStrategy {
             delay: Long, duration: Long
     ): Long
 
-    open fun updateHeaderOnReveal(headerView: View) { }
-    open fun updateHeaderOnConceal(headerView: View) { }
+    open fun updateHeaderOnReveal(headerView: View) {}
+    open fun updateHeaderOnConceal(headerView: View) {}
 
 }

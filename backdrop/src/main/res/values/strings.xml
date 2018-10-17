@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">backdroplayout</string>
 
-    <string name="backdrop_front_layer_behavior">io.github.rokarpov.backdrop.BackdropBackLayer$DefaultFrontLayerBehavior</string>
-    <string name="backdrop_back_layer_behavior">io.github.rokarpov.backdrop.BackdropBackLayer$Behavior</string>
+    <string name="backdrop_back_layer__default_front_layer_behavior">io.github.rokarpov.backdrop.BackdropBackLayer$DefaultFrontLayerBehavior</string>
+    <string name="backdrop_front_layer_behavior">io.github.rokarpov.backdrop.BackdropFrontLayer$Behavior</string>
+
 </resources>

@@ -12,19 +12,26 @@ interface FrontLayerBehaviorOnClickStrategy {
     fun onTouchEvent(child: View, ev: MotionEvent): Boolean
 }
 
-interface FrontLayerBehaviorOnClickCallback {
+interface FrontLayerClickListener {
+    val concealOnClick: Boolean
+
+    fun allowConcealOnClick()
+    fun allowConcealOnClick(callback: FrontLayerClickCallback)
+    fun disallowConcealOnClick()
+}
+
+interface FrontLayerClickCallback {
     fun onRevealedFrontViewClick()
 }
 
-object EmptyFrontLayerBehaviorOnClickCallback: FrontLayerBehaviorOnClickCallback {
-    override fun onRevealedFrontViewClick() {  }
+object EmptyFrontLayerClickCallback : FrontLayerClickCallback {
+    override fun onRevealedFrontViewClick() {}
 }
 
 
-
 class ConcealOnClickFrontLayerBehaviorOnClickStrategy(
-        private val clickCallback: FrontLayerBehaviorOnClickCallback
-): FrontLayerBehaviorOnClickStrategy {
+        private val clickCallback: FrontLayerClickCallback
+) : FrontLayerBehaviorOnClickStrategy {
     private var backLayer = WeakReference<BackdropBackLayer>(null)
     private val gestureDetectorCompat: GestureDetectorCompat = GestureDetectorCompat(null, FrontViewGestureListener(this))
 
@@ -36,6 +43,7 @@ class ConcealOnClickFrontLayerBehaviorOnClickStrategy(
     override fun onInterceptTouchEvent(child: View, ev: MotionEvent): Boolean {
         return (backLayer.get()?.state == BackdropBackLayerState.REVEALED) && isTouchInView(child, ev)
     }
+
     override fun onTouchEvent(child: View, ev: MotionEvent): Boolean {
         return gestureDetectorCompat.onTouchEvent(ev)
     }
@@ -55,7 +63,7 @@ class ConcealOnClickFrontLayerBehaviorOnClickStrategy(
 
     class FrontViewGestureListener(
             strategy: ConcealOnClickFrontLayerBehaviorOnClickStrategy
-    ): GestureDetector.SimpleOnGestureListener() {
+    ) : GestureDetector.SimpleOnGestureListener() {
         val owner = WeakReference<ConcealOnClickFrontLayerBehaviorOnClickStrategy>(strategy)
 
         override fun onDown(e: MotionEvent): Boolean = true
@@ -72,8 +80,8 @@ class ConcealOnClickFrontLayerBehaviorOnClickStrategy(
     }
 }
 
-object NotConcealOnClickFrontLayerBehaviorOnClickStrategy: FrontLayerBehaviorOnClickStrategy {
-    override fun setBackLayer(backLayer: BackdropBackLayer?) {  }
+object NotConcealOnClickFrontLayerBehaviorOnClickStrategy : FrontLayerBehaviorOnClickStrategy {
+    override fun setBackLayer(backLayer: BackdropBackLayer?) {}
     override fun onInterceptTouchEvent(child: View, ev: MotionEvent): Boolean = false
     override fun onTouchEvent(child: View, ev: MotionEvent): Boolean = false
 }

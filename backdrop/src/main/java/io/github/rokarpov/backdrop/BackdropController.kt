@@ -1,71 +1,77 @@
 package io.github.rokarpov.backdrop
 
 import android.annotation.TargetApi
-import android.app.ActionBar
-import android.app.Activity
 import android.content.Context
-import android.content.res.Resources
 import android.graphics.drawable.Drawable
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.ActionBar as SupportActionBar
 import androidx.appcompat.widget.Toolbar as SupportToolbar
-import android.view.MenuItem
 import android.view.View
 import android.widget.Toolbar
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import java.lang.ref.WeakReference
 
 const val EMPTY_ID: Int = -1
 const val DEFAULT_ANIMATION_DURATION: Long = -1
 
+@DslMarker
+annotation class DslBackdropControllerMarker
+
 class BackdropController {
+    companion object {
+        fun build(
+                backLayer: BackdropBackLayer,
+                context: Context, initializer: Builder.() -> Unit
+        ) = Builder(backLayer, context).apply(initializer).build()
+    }
+
     private val backLayer: BackdropBackLayer
-    private val appBarStrategy: AppBarStrategy
-    private val menuIdToRevealDataMap: Map<Int, RevealData>
-    private val defaultAppBarTitle: CharSequence
-    private val defaultNavIcon: Drawable
-    private val revealedNavIcon: Drawable
-
+    private val concealedNavIcon: Drawable
+    private val concealedTitle: CharSequence
+    private val frontLayerStrategy: FrontLayerStrategy
     private var isBackdropRevealed: Boolean = false
+    private val mMenuRevealData: Map<Int, ControllerData>
+    private val mNavIconRevealData: ControllerData
+    private val toolbarStrategy: ToolbarStrategy
 
-    internal constructor(
+    private constructor(
             backLayer: BackdropBackLayer,
-            frontLayer: View?,
-            menuIdToRevealDataMap: Map<Int, RevealData>,
-            appBarStrategy: AppBarStrategy,
-            defaultTitle: CharSequence,
-            defaultNavIcon: Drawable,
-            revealedNavIcon: Drawable) {
+            frontLayerStrategy: FrontLayerStrategy,
+            navIconRevealData: ControllerData,
+            menuRevealData: Map<Int, ControllerData>,
+            toolbarStrategy: ToolbarStrategy,
+            concealedTitle: CharSequence,
+            concealedNavIcon: Drawable) {
         this.backLayer = backLayer
-        this.menuIdToRevealDataMap = menuIdToRevealDataMap
+        this.mNavIconRevealData = navIconRevealData
+        this.mMenuRevealData = menuRevealData
 
-        this.appBarStrategy = appBarStrategy
-        this.appBarStrategy.setOwner(WeakReference(this))
+        this.toolbarStrategy = toolbarStrategy
+        this.toolbarStrategy.setOwner(this)
+        this.toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
 
-        this.defaultAppBarTitle = defaultTitle
-        this.defaultNavIcon = defaultNavIcon
+        this.frontLayerStrategy = frontLayerStrategy
+        this.frontLayerStrategy.setOwner(this)
 
-        this.revealedNavIcon = revealedNavIcon
+        this.concealedTitle = concealedTitle
+        this.concealedNavIcon = concealedNavIcon
+    }
 
-        if (frontLayer != null) {
-            val lp = frontLayer.layoutParams
-            if (lp is CoordinatorLayout.LayoutParams) {
-                val behavior = lp.behavior
-                if (behavior is BackdropBackLayer.FrontLayerBehavior) {
-                    behavior.allowConcealOnClick(RevealedFrontViewCallback(this))
-                }
-            }
+    fun onNavigationIconSelected() {
+        if (isBackdropRevealed) {
+            conceal()
+        } else {
+            mNavIconRevealData?.onReveal(this)
         }
     }
 
-    fun onOptionsItemSelected(menuItem: MenuItem):Boolean {
-        val menuItemId = menuItem.itemId
-        if (menuItemId == android.R.id.home && isBackdropRevealed) {
+    fun onOptionsItemSelected(menuItemId: Int): Boolean {
+        if (menuItemId == R.id.home && isBackdropRevealed) {
             conceal()
         } else {
-            val data = menuIdToRevealDataMap[menuItemId] ?: return false
-            reveal(data)
+            mMenuRevealData[menuItemId]?.onReveal(this) ?: return false
         }
         return true
     }
@@ -74,138 +80,388 @@ class BackdropController {
         backLayer.onPrepare()
         when (backLayer.state) {
             BackdropBackLayerState.REVEALED -> {
-                val data = findDataByView(backLayer.revealedView) ?: return
-                appBarStrategy.updateContent(data.title, revealedNavIcon)
-                isBackdropRevealed = true
+                val data = findDataByView(backLayer.revealedView)?.onReveal(this)
             }
-            BackdropBackLayerState.CONCEALED -> {
-                appBarStrategy.updateContent(defaultAppBarTitle, defaultNavIcon)
-                isBackdropRevealed = false
-            }
+            BackdropBackLayerState.CONCEALED -> updateControllerOnConceal()
         }
     }
 
-    fun reveal(view: View): Boolean{
-        val data = findDataByView(view)
-        if (data != null) {
-            return reveal(data)
+    fun reveal(view: View): Boolean = findDataByView(view)?.onReveal(this) ?: false
+    fun conceal(): Boolean = updateControllerOnConceal()
+
+
+    internal fun updateControllerOnConceal(): Boolean {
+        val isConcealed = backLayer.concealBackView()
+        if (isConcealed) {
+            toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
+            isBackdropRevealed = false
         }
-        return false
-    }
-    fun conceal(): Boolean {
-        appBarStrategy.updateContent(defaultAppBarTitle, defaultNavIcon)
-        isBackdropRevealed = false
-        return backLayer.concealBackView()
+        return isConcealed
     }
 
-    private fun reveal(data: RevealData): Boolean {
-        appBarStrategy.updateContent(data.title, revealedNavIcon)
-        isBackdropRevealed = true
-        return backLayer.revealBackView(data.view)
+    internal fun updateControllerOnReveal(
+            revealedView: View,
+            revealedTitle: CharSequence,
+            revealedNavIcon: Drawable
+    ): Boolean {
+        val isRevealed = backLayer.revealBackView(revealedView)
+        if (isRevealed) {
+            toolbarStrategy.updateContent(revealedTitle, revealedNavIcon)
+            isBackdropRevealed = true
+        }
+        return isRevealed
     }
 
-    private fun findDataByView(view:View?): RevealData? {
+    private fun findDataByView(view: View?): ControllerData? {
         if (view == null) return null
-        for ((_, data) in menuIdToRevealDataMap) {
-            if (data.view == view) return data
+        for ((_, data) in mMenuRevealData) {
+            if ((data is RevealControllerData) && (data.view == view)) return data
         }
         return null
     }
 
-    class RevealedFrontViewCallback(controller: BackdropController): FrontLayerBehaviorOnClickCallback {
-        val owner = WeakReference<BackdropController>(controller)
+    @DslBackdropControllerMarker
+    class Builder(
+            private val backLayer: BackdropBackLayer,
+            private val context: Context) {
+        companion object {
+            private const val NO_TOOLBAR_MSG = "The builder should have the specified toolbar."
+            private const val NO_CONCEALED_DRAWABLE_MSG = "The concealed drawable is not specified."
+        }
 
-        override fun onRevealedFrontViewClick() {
-            owner.get()?.let {
-                it.appBarStrategy.updateContent(it.defaultAppBarTitle, it.defaultNavIcon)
-                it.isBackdropRevealed = false
+        private var toolbarStrategy: ToolbarStrategy? = null
+        private var frontLayerStrategy: FrontLayerStrategy = NoFrontLayerStrategy
+
+        private var navIconRevealSettings: RevealSettings? = null
+        private val menuRevealSettings: MutableMap<Int, RevealSettings> = mutableMapOf()
+        private val interactionSettingsField: MutableList<InteractionSettings> = mutableListOf()
+
+        var toolbar: Toolbar?
+            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+            get() {
+                val strategy = toolbarStrategy
+                return when (strategy) {
+                    is PlatformToolbarStrategy -> strategy.toolbar
+                    else -> null
+                }
+            }
+            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+            set(value) {
+                if (value == null) return
+                toolbarStrategy = PlatformToolbarStrategy(value)
+            }
+        var supportToolbar: SupportToolbar?
+            get() {
+                val strategy = toolbarStrategy
+                return when (strategy) {
+                    is SupportToolbarStrategy -> strategy.toolbar
+                    else -> null
+                }
+            }
+            set(value) {
+                if (value == null) return
+                toolbarStrategy = SupportToolbarStrategy(value)
+            }
+
+        var concealedTitleId: Int = EMPTY_ID
+            set(@StringRes value) {
+                if (value != EMPTY_ID) {
+                    concealedTitle = null
+                }
+                field = value
+            }
+        var concealedTitle: CharSequence? = null
+            set(value) {
+                if (value != null) {
+                    concealedTitleId = EMPTY_ID
+                }
+                field = value
+            }
+        var revealedNavigationIconId: Int = EMPTY_ID
+            set(@DrawableRes value) {
+                if (value != EMPTY_ID) {
+                    revealedNavigationIcon = null
+                }
+                field = value
+            }
+        var revealedNavigationIcon: Drawable? = null
+            set(value) {
+                if (value != null) {
+                    revealedNavigationIconId = EMPTY_ID
+                }
+                field = value
+            }
+        var concealedNavigationIconId: Int = EMPTY_ID
+            set(@DrawableRes value) {
+                if (value != EMPTY_ID) {
+                    concealedNavigationIcon = null
+                }
+                field = value
+            }
+        var concealedNavigationIcon: Drawable? = null
+            set(value) {
+                if (value != null) {
+                    concealedNavigationIconId = EMPTY_ID
+                }
+                field = value
+            }
+
+
+        var frontLayer: View? = null
+            set(value) {
+                field = value
+                frontLayerStrategy = createFrontClickStrategy(value)
+            }
+
+        fun navigationIconSettings(view: View, init: RevealSettings.() -> Unit = { }): RevealSettings {
+            val settings = RevealSettings(view)
+            settings.init()
+            this.navIconRevealSettings = settings
+            return settings
+        }
+
+        fun menuItemRevealSettings(menuItemId: Int, view: View, init: RevealSettings.() -> Unit = { }): RevealSettings {
+            val settings = RevealSettings(view)
+            settings.init()
+            menuRevealSettings[menuItemId] = settings
+            return settings
+        }
+
+        fun interationSettings(view: View, init: InteractionSettings.() -> Unit = { }): InteractionSettings {
+            val settings = InteractionSettings(view)
+            settings.init()
+            interactionSettingsField.add(settings)
+            return settings
+        }
+
+        fun listener(init: ListenerBuilder.() -> Unit) {
+            val builder = ListenerBuilder()
+            builder.init()
+            backLayer.addBackdropListener(builder.build())
+        }
+
+        @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+        fun withToolbar(toolbar: Toolbar): Builder {
+            this.toolbar = toolbar
+            return this
+        }
+
+        fun withToolbar(toolbar: SupportToolbar): Builder {
+            this.supportToolbar = toolbar
+            return this
+        }
+
+        fun withRevealedNavigationIcon(@DrawableRes id: Int): Builder {
+            this.revealedNavigationIconId = id
+            return this
+        }
+
+        fun withRevealedNavigationIcon(drawable: Drawable): Builder {
+            this.revealedNavigationIcon = drawable
+            return this
+        }
+
+        fun withConcealedNavigationIcon(@DrawableRes id: Int): Builder {
+            this.concealedNavigationIconId = id
+            return this
+        }
+
+        fun withConcealedNavigationIcon(drawable: Drawable): Builder {
+            this.concealedNavigationIcon = drawable
+            return this
+        }
+
+        fun withConcealedTitle(@StringRes id: Int): Builder {
+            this.concealedTitleId = id
+            return this
+        }
+
+        fun withConcealedTitle(title: CharSequence): Builder {
+            this.concealedTitle = title
+            return this
+        }
+
+        fun withNavigationIconRevealSettings(settings: RevealSettings): Builder {
+            this.navIconRevealSettings = settings
+            return this
+        }
+
+        fun withMenuItemRevealSettings(vararg settings: Pair<Int, RevealSettings>): Builder {
+            this.menuRevealSettings.clear()
+            this.menuRevealSettings.putAll(settings)
+            return this
+        }
+
+        fun withMenuItemRevealSettings(settings: Map<Int, RevealSettings>): Builder {
+            this.menuRevealSettings.clear()
+            this.menuRevealSettings.putAll(settings)
+            return this
+        }
+
+        fun withInteractionSettings(vararg settings: InteractionSettings): Builder {
+            this.interactionSettingsField.clear()
+            this.interactionSettingsField.addAll(settings)
+            return this
+        }
+
+        fun withInteractionSettings(settings: Iterable<InteractionSettings>): Builder {
+            this.interactionSettingsField.clear()
+            this.interactionSettingsField.addAll(settings)
+            return this
+        }
+
+        fun build(): BackdropController {
+            val toolbarStrategy = this.toolbarStrategy
+                    ?: throw IllegalStateException(NO_TOOLBAR_MSG)
+
+            val concealedTitle = selectString(concealedTitle, concealedTitleId)
+                    ?: toolbarStrategy.title
+            val concealedDrawable = selectDrawable(this.concealedNavigationIcon, this.concealedNavigationIconId)
+                    ?: throw IllegalStateException(NO_CONCEALED_DRAWABLE_MSG)
+            val defaultRevealedDrawable = selectDrawable(this.revealedNavigationIcon, this.revealedNavigationIconId)
+                    ?: concealedDrawable
+
+
+            for (s in interactionSettingsField) {
+                val data = backLayer.getInteractionData(s.view)
+                s.assignTo(data)
+            }
+
+            val navIconRevealData = navIconRevealSettings?.let {
+                val revealedTitle = selectString(it.title, it.titleId) ?: concealedTitle
+                val revealedNavIcon = selectDrawable(it.navIcon, it.navIconId)
+                        ?: defaultRevealedDrawable
+                RevealControllerData(it.view, revealedTitle, revealedNavIcon)
+            }
+            val menuRevealData: MutableMap<Int, RevealControllerData> = mutableMapOf()
+            for ((menuId, settings) in menuRevealSettings) {
+                val revealedTitle = selectString(settings.title, settings.titleId) ?: concealedTitle
+                val revealedNavIcon = selectDrawable(settings.navIcon, settings.navIconId)
+                        ?: defaultRevealedDrawable
+                menuRevealData[menuId] = RevealControllerData(settings.view, revealedTitle, revealedNavIcon)
+            }
+
+
+            return BackdropController(
+                    backLayer,
+                    frontLayerStrategy,
+                    navIconRevealData ?: EmptyControllerData,
+                    menuRevealData,
+                    toolbarStrategy,
+                    concealedTitle,
+                    concealedDrawable
+            )
+        }
+
+        private fun createFrontClickStrategy(frontLayer: View?): FrontLayerStrategy {
+            val frontLayer = frontLayer ?: return NoFrontLayerStrategy
+            val lp = frontLayer.layoutParams as? CoordinatorLayout.LayoutParams
+                    ?: return NoFrontLayerStrategy
+            val behavior = lp.behavior as? FrontLayerClickListener
+                    ?: return NoFrontLayerStrategy
+            return if (behavior.concealOnClick) {
+                BackdropFrontLayerStrategy(behavior)
+            } else {
+                NoFrontLayerStrategy
+            }
+        }
+
+        private fun selectString(string: CharSequence?, stringId: Int): CharSequence? {
+            return when {
+                string != null -> string
+                stringId != EMPTY_ID -> context.resources.getString(stringId)
+                else -> null
+            }
+        }
+
+        private fun selectDrawable(drawable: Drawable?, drawableId: Int): Drawable? {
+            return when {
+                drawable != null -> drawable
+                drawableId != EMPTY_ID -> getDrawable(drawableId)
+                else -> null
+            }
+        }
+
+        private fun getDrawable(resId: Int): Drawable {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                context.resources.getDrawable(resId, context.theme)
+            } else {
+                context.resources.getDrawable(resId)
             }
         }
     }
 }
 
-class Mapping {
-    private var isNavigation: Boolean = false
-    internal var menuItemId: Int = EMPTY_ID
-        private set
-    internal var viewId: Int = EMPTY_ID
-        private set
-    internal var view: View? = null
-        private set
-    internal var titleId: Int = EMPTY_ID
-        private set
-    internal var title: CharSequence? = null
-        private set
-
-    fun isNavigationMapping(value: Boolean = true): Mapping {
-        if (value) {
-            this.menuItemId = android.R.id.home
-        } else {
-            this.menuItemId = EMPTY_ID
+@DslBackdropControllerMarker
+class RevealSettings(val view: View) {
+    var title: CharSequence? = null
+        set(value) {
+            if (value != null) {
+                titleId = EMPTY_ID
+            }
+            field = value
         }
-        this.isNavigation = value
-        return this
-    }
-
-    fun withMenuItem(id: Int): Mapping {
-        this.menuItemId = id
-        if (menuItemId == android.R.id.home) {
-            this.isNavigation = true
+    var titleId: Int = EMPTY_ID
+        set(@StringRes value) {
+            if (value != EMPTY_ID) {
+                title = null
+            }
+            field = value
         }
-        return this
-    }
+    var navIcon: Drawable? = null
+        set(value) {
+            if (value != null) {
+                navIconId = EMPTY_ID
+            }
+            field = value
+        }
+    var navIconId: Int = EMPTY_ID
+        set(@DrawableRes value) {
+            if (value != EMPTY_ID) {
+                navIcon = null
+            }
+            field = value
+        }
 
-    fun withContentView(id: Int): Mapping {
-        this.viewId = id
-        this.view = null
-        return this
-    }
-    fun withContentView(view: View): Mapping {
-        this.view = view
-        this.viewId = EMPTY_ID
-        return this
-    }
-
-    fun withAppTitle(id: Int): Mapping {
-        this.titleId = id
-        this.title = null
-        return this
-    }
-    fun withAppTitle(title: CharSequence): Mapping {
+    fun withTitle(title: CharSequence): RevealSettings {
         this.title = title
-        this.titleId = EMPTY_ID
+        return this
+    }
+
+    fun withTitle(titleId: Int): RevealSettings {
+        this.titleId = titleId
+        return this
+    }
+
+    fun withNavIcon(navIcon: Drawable): RevealSettings {
+        this.navIcon = navIcon
+        return this
+    }
+
+    fun withNavIcon(@DrawableRes navIconId: Int): RevealSettings {
+        this.navIconId = navIconId
         return this
     }
 }
 
-class InteractionSettings {
+@DslBackdropControllerMarker
+class InteractionSettings(val view: View) {
+    var animationProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider? = null
+    var hideHeader: Boolean = false
+    var inAnimationDuration: Long = DEFAULT_ANIMATION_DURATION
+    var outAnimationDuration: Long = DEFAULT_ANIMATION_DURATION
 
-    internal val viewId: Int
-    internal val view: View?
-    private var animationProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider? = null
-    private var hideHeader: Boolean = false
-    private var inAnimationDuration: Long = DEFAULT_ANIMATION_DURATION
-    private var outAnimationDuration: Long = DEFAULT_ANIMATION_DURATION
-
-
-    constructor(viewId: Int) {
-        this.viewId = viewId
-        this.view = null
-    }
-    constructor(view: View) {
-        this.viewId = EMPTY_ID
-        this.view = view
-    }
-
-    fun withContentAnimationProvider(animationProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider):InteractionSettings {
+    fun withContentAnimationProvider(animationProvider: BackdropBackLayerInteractionData.ContentAnimatorProvider): InteractionSettings {
         this.animationProvider = animationProvider
         return this
     }
-    fun withHideHeader(hideHeader: Boolean):InteractionSettings {
+
+    fun withHideHeader(hideHeader: Boolean): InteractionSettings {
         this.hideHeader = hideHeader
         return this
     }
-    fun withAnimationDurations(inDuration: Long, outDuration: Long):InteractionSettings {
+
+    fun withAnimationDurations(inDuration: Long, outDuration: Long): InteractionSettings {
         this.inAnimationDuration = inDuration
         this.outAnimationDuration = outDuration
         return this
@@ -214,7 +470,7 @@ class InteractionSettings {
     internal fun assignTo(interactionData: BackdropBackLayerInteractionData) {
         interactionData.hideHeader = hideHeader
         if (animationProvider != null) {
-                interactionData.contentAnimatorProvider = animationProvider
+            interactionData.contentAnimatorProvider = animationProvider
         }
         if (inAnimationDuration != DEFAULT_ANIMATION_DURATION) {
             interactionData.inAnimationDuration = inAnimationDuration
@@ -225,375 +481,130 @@ class InteractionSettings {
     }
 }
 
-interface UnmappedMenuItemClickedCallback {
-    fun onMenuItemClicked(menuItem: MenuItem): Boolean
+
+private interface ControllerData {
+    fun onReveal(controller: BackdropController): Boolean
 }
 
-internal interface AppBarStrategy {
+private class RevealControllerData(
+        val view: View,
+        val title: CharSequence,
+        val navIcon: Drawable
+) : ControllerData {
+    override fun onReveal(controller: BackdropController): Boolean = controller.updateControllerOnReveal(view, title, navIcon)
+}
+
+private object EmptyControllerData : ControllerData {
+    override fun onReveal(controller: BackdropController): Boolean = false
+}
+
+
+private interface ToolbarStrategy {
+    val title: CharSequence
+
     fun updateContent(title: CharSequence, navIcon: Drawable?)
-    fun setOwner(owner: WeakReference<BackdropController>) { }
+    fun setOwner(owner: BackdropController) {}
 }
-private class ToolbarStrategy(
-        private val toolbar: Toolbar,
-        private val callback: UnmappedMenuItemClickedCallback?
-): AppBarStrategy {
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+
+@TargetApi(Build.VERSION_CODES.LOLLIPOP)
+private class PlatformToolbarStrategy(
+        val toolbar: Toolbar
+) : ToolbarStrategy {
+    override val title: CharSequence
+        get() = toolbar.title
+
     override fun updateContent(title: CharSequence, navIcon: Drawable?) {
         toolbar.title = title
         toolbar.navigationIcon = navIcon
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    override fun setOwner(owner: WeakReference<BackdropController>) {
+    override fun setOwner(owner: BackdropController) {
+        val weakOwner = WeakReference(owner)
         toolbar.setOnMenuItemClickListener {
-            val controller = owner.get() ?: return@setOnMenuItemClickListener false
-            if (controller.onOptionsItemSelected(it)) return@setOnMenuItemClickListener true
-            return@setOnMenuItemClickListener callback?.onMenuItemClicked(it) ?: false
+            val controller = weakOwner.get() ?: return@setOnMenuItemClickListener false
+            return@setOnMenuItemClickListener controller.onOptionsItemSelected(it.itemId)
         }
     }
 }
+
 private class SupportToolbarStrategy(
-        private val toolbar: SupportToolbar,
-        private val callback: UnmappedMenuItemClickedCallback?
-): AppBarStrategy {
+        val toolbar: SupportToolbar
+) : ToolbarStrategy {
+    override val title: CharSequence
+        get() = toolbar.title
+
     override fun updateContent(title: CharSequence, navIcon: Drawable?) {
         toolbar.title = title
         toolbar.navigationIcon = navIcon
     }
 
-    override fun setOwner(owner: WeakReference<BackdropController>) {
+    override fun setOwner(owner: BackdropController) {
+        val weakOwner = WeakReference(owner)
+        toolbar.setNavigationOnClickListener {
+            weakOwner.get()?.onNavigationIconSelected()
+        }
         toolbar.setOnMenuItemClickListener {
-            val controller = owner.get() ?: return@setOnMenuItemClickListener false
-            if (controller.onOptionsItemSelected(it)) return@setOnMenuItemClickListener true
-            return@setOnMenuItemClickListener callback?.onMenuItemClicked(it) ?: false
+            weakOwner.get()?.onOptionsItemSelected(it.itemId) ?: false
         }
     }
 }
-private class ActionBarStrategy(
-        private val actionBar: ActionBar
-): AppBarStrategy {
-    override fun updateContent(title: CharSequence, navIcon: Drawable?) {
-        actionBar.title = title
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            actionBar.setHomeAsUpIndicator(navIcon)
+
+
+private interface FrontLayerStrategy {
+    fun setOwner(owner: BackdropController)
+}
+
+private object NoFrontLayerStrategy : FrontLayerStrategy {
+    override fun setOwner(owner: BackdropController) {}
+}
+
+private class BackdropFrontLayerStrategy(
+        private val clickListener: FrontLayerClickListener
+) : FrontLayerStrategy {
+    override fun setOwner(owner: BackdropController) {
+        if (clickListener.concealOnClick)
+            clickListener.allowConcealOnClick(RevealedFrontLayerCallback(owner))
+    }
+
+    class RevealedFrontLayerCallback(controller: BackdropController) : FrontLayerClickCallback {
+        val owner = WeakReference<BackdropController>(controller)
+
+        override fun onRevealedFrontViewClick() {
+            owner.get()?.updateControllerOnConceal()
         }
     }
 }
-private class SupportActionBarStrategy(
-        private val actionBar: SupportActionBar
-): AppBarStrategy {
-    override fun updateContent(title: CharSequence, navIcon: Drawable?) {
-        actionBar.title = title
-        actionBar.setHomeAsUpIndicator(navIcon)
+
+class ListenerBuilder {
+    private var onBeforeConcealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> true }
+    private var onConcealAction: (BackdropBackLayer, View) -> Unit = { _, _ -> }
+    private var onBeforeRevealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> true }
+    private var onRevealAction: (BackdropBackLayer, View) -> Unit = { _, _ -> }
+
+    fun onBeforeConceal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Boolean) {
+        onBeforeConcealAction = action
     }
+    fun onConceal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Unit) {
+        onConcealAction = action
+    }
+    fun onBeforeReveal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Boolean) {
+        onBeforeRevealAction = action
+    }
+    fun onReveal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Unit) {
+        onRevealAction = action
+    }
+
+    fun build(): BackdropBackLayer.Listener = LambdaListener(onBeforeConcealAction, onConcealAction, onBeforeRevealAction, onRevealAction)
 }
 
-internal class RevealData(val view: View, val title: CharSequence)
-
-class BackdropControllerBuilder {
-    companion object {
-        private const val NO_CONTEXT_MSG = "The builder should have the specified context. Use the withContext() or withActivity() method to do this."
-        private const val NO_ACTION_BAR_MSG = "The builder should have the specified toolbar, action bar or activity. Use the withToolbar() or withActivity() method."
-        private const val NO_ACTIVITY_MSG = "The builder should have the specified activity. Use the withActivity() method."
-        private const val TOOLBAR_NOT_FOUND_MSG = "The view under the specified toolbarId is not android.widget.Toolbar or android.support.v7.widget.Toolbar."
-        private const val NO_DRAWABLE_MSG = "The drawable is not specified."
-        private const val VIEW_IN_MAPPING_NOT_FOUND_MSG = "The Mapping does not contain a view and the Mapping's viewId is empty."
-        private const val NO_BACK_LAYER_MSG = "The BackLayer must be specified using the withBackLayer method."
-    }
-    private var context: Context? = null
-    private var activity: Activity? = null
-    private var appCompatActivity: AppCompatActivity? = null
-
-    private var backLayerId: Int = EMPTY_ID
-    private var backLayer: BackdropBackLayer? = null
-
-    private var frontLayerId: Int = EMPTY_ID
-    private var frontLayer: View? = null
-
-    private var toolbarId: Int = EMPTY_ID
-    private var toolbar: Toolbar? = null
-    private var supportToolbar: SupportToolbar? = null
-
-    private var unmappedMenuItemClickedCallback: UnmappedMenuItemClickedCallback? = null
-
-    private var revealedNavIconId: Int = EMPTY_ID
-    private var revealedNavIcon: Drawable? = null
-    private var concealedNavIconId: Int = EMPTY_ID
-    private var concealedNavIcon: Drawable? = null
-
-    private val mappings: MutableList<Mapping> = mutableListOf()
-    private val settings: MutableList<InteractionSettings> = mutableListOf()
-
-    fun withContext(context: Context): BackdropControllerBuilder {
-        this.context = context
-        this.activity = null
-        this.appCompatActivity = null
-        return this
-    }
-    fun withActivity(activity: Activity): BackdropControllerBuilder {
-        this.activity = activity
-        this.context = activity.applicationContext
-        this.appCompatActivity = null
-        return this
-    }
-    fun withActivity(activity: AppCompatActivity): BackdropControllerBuilder {
-        this.appCompatActivity = activity
-        this.context = activity.applicationContext
-        this.activity = null
-        return this
-    }
-
-    fun withBackLayer(id: Int): BackdropControllerBuilder {
-        this.backLayerId = id
-        this.backLayer = null
-        return this
-    }
-    fun withBackLayer(backLayer: BackdropBackLayer): BackdropControllerBuilder {
-        this.backLayer = backLayer
-        this.backLayerId = EMPTY_ID
-        return this
-    }
-
-    fun withFrontLayer(id: Int): BackdropControllerBuilder {
-        this.frontLayerId = id
-        this.frontLayer = null
-        return this
-    }
-    fun withFrontLayer(frontLayer: BackdropBackLayer): BackdropControllerBuilder {
-        this.frontLayer = backLayer
-        this.frontLayerId = EMPTY_ID
-        return this
-    }
-
-    fun withToolbar(id: Int, unmappedMenuItemClickedCallback: UnmappedMenuItemClickedCallback? = null): BackdropControllerBuilder {
-        this.toolbarId = id
-        this.toolbar = null
-        this.supportToolbar = null
-        this.unmappedMenuItemClickedCallback = unmappedMenuItemClickedCallback
-        return this
-    }
-    fun withToolbar(id: Int, unmappedMenuItemClickedCallback: ((i: MenuItem) -> Boolean)): BackdropControllerBuilder {
-        return withToolbar(id, object: UnmappedMenuItemClickedCallback {
-            override fun onMenuItemClicked(menuItem: MenuItem): Boolean {
-                return unmappedMenuItemClickedCallback(menuItem)
-            }
-        })
-    }
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    fun withToolbar(toolbar: Toolbar, unmappedMenuItemClickedCallback: UnmappedMenuItemClickedCallback? = null): BackdropControllerBuilder {
-        this.toolbar = toolbar
-        this.toolbarId = EMPTY_ID
-        this.supportToolbar = null
-        this.unmappedMenuItemClickedCallback = unmappedMenuItemClickedCallback
-        return this
-    }
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    fun withToolbar(toolbar: Toolbar, unmappedMenuItemClickedCallback: ((i: MenuItem) -> Boolean)): BackdropControllerBuilder {
-        return withToolbar(toolbar, object: UnmappedMenuItemClickedCallback {
-            override fun onMenuItemClicked(menuItem: MenuItem): Boolean {
-                return unmappedMenuItemClickedCallback(menuItem)
-            }
-        })
-    }
-
-    fun withToolbar(toolbar: SupportToolbar, unmappedMenuItemClickedCallback: UnmappedMenuItemClickedCallback? = null): BackdropControllerBuilder {
-        this.supportToolbar = toolbar
-        this.toolbarId = EMPTY_ID
-        this.toolbar = null
-        this.unmappedMenuItemClickedCallback = unmappedMenuItemClickedCallback
-        return this
-    }
-    fun withToolbar(toolbar: SupportToolbar, unmappedMenuItemClickedCallback: ((i: MenuItem) -> Boolean)): BackdropControllerBuilder {
-        return withToolbar(toolbar, object: UnmappedMenuItemClickedCallback {
-            override fun onMenuItemClicked(menuItem: MenuItem): Boolean {
-                return unmappedMenuItemClickedCallback(menuItem)
-            }
-        })
-    }
-
-    fun withRevealedNavigationIcon(id: Int): BackdropControllerBuilder {
-        this.revealedNavIconId = id
-        this.revealedNavIcon = null
-        return this
-    }
-    fun withRevealedNavigationIcon(drawable: Drawable): BackdropControllerBuilder {
-        this.revealedNavIcon = drawable
-        this.revealedNavIconId = EMPTY_ID
-        return this
-    }
-    fun withConcealedNavigationIcon(id: Int): BackdropControllerBuilder {
-        this.concealedNavIconId = id
-        this.concealedNavIcon = null
-        return this
-    }
-    fun withConcealedNavigationIcon(drawable: Drawable): BackdropControllerBuilder {
-        this.concealedNavIcon = drawable
-        this.concealedNavIconId = EMPTY_ID
-        return this
-    }
-
-    fun withMappings(vararg mappings: Mapping): BackdropControllerBuilder {
-        this.mappings.clear()
-        this.mappings.addAll(mappings)
-        return this
-    }
-    fun withMappings(mappings: Iterable<Mapping>): BackdropControllerBuilder {
-        this.mappings.clear()
-        this.mappings.addAll(mappings)
-        return this
-    }
-
-    fun withInteractionSettings(vararg settings: InteractionSettings): BackdropControllerBuilder {
-        this.settings.clear()
-        this.settings.addAll(settings)
-        return this
-    }
-    fun withInteractionSettings(settings: Iterable<InteractionSettings>): BackdropControllerBuilder {
-        this.settings.clear()
-        this.settings.addAll(settings)
-        return this
-    }
-
-    fun build(): BackdropController {
-        var backLayer = selectBackLayer()
-        for (s in settings) {
-            val contentView = selectView(s.view, s.viewId) ?: continue
-            val data = backLayer.getInteractionData(contentView)
-            s.assignTo(data)
-        }
-
-        return BackdropController(
-                backLayer,
-                selectFrontView(),
-                createMenuIdToRevealDataMap(),
-                createAppBarStrategy(),
-                getActivityTitle(),
-                selectConcealedNavIconDrawable(),
-                selectRevealedNavIconDrawable())
-    }
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private fun createAppBarStrategy(): AppBarStrategy {
-        val callback = this.unmappedMenuItemClickedCallback
-        val toolbar = this.toolbar
-        val supportToolbar = this.supportToolbar
-        val actionBar = this.activity?.actionBar
-        val supportActionBar = this.appCompatActivity?.supportActionBar
-
-        return  when {
-            toolbar != null -> ToolbarStrategy(toolbar, callback)
-            supportToolbar != null -> SupportToolbarStrategy(supportToolbar, callback)
-            toolbarId != EMPTY_ID -> {
-                val view = getView<View>(toolbarId)
-                when (view) {
-                    is Toolbar -> ToolbarStrategy(view, callback)
-                    is SupportToolbar -> SupportToolbarStrategy(view, callback)
-                    else -> throw IllegalStateException(TOOLBAR_NOT_FOUND_MSG)
-                }
-            }
-            actionBar != null -> ActionBarStrategy(actionBar)
-            supportActionBar != null -> SupportActionBarStrategy(supportActionBar)
-            else -> throw IllegalStateException(NO_ACTION_BAR_MSG)
-        }
-    }
-    private fun createMenuIdToRevealDataMap(): Map<Int, RevealData> {
-        val resources = getResources()
-        val menuIdToRevealDataMap: MutableMap<Int, RevealData> = mutableMapOf()
-        for (mapping in this.mappings) {
-            addRevealData(menuIdToRevealDataMap, mapping, resources)
-        }
-        return menuIdToRevealDataMap
-    }
-    private fun selectBackLayer(): BackdropBackLayer {
-        return selectView(this.backLayer, this.backLayerId) ?: throw IllegalStateException(NO_BACK_LAYER_MSG)
-    }
-    private fun selectFrontView(): View? {
-        return when {
-            this.frontLayer != null -> this.frontLayer
-            this.frontLayerId != EMPTY_ID -> getView(this.frontLayerId)
-            else -> null
-        }
-    }
-    private fun <T: View> selectView(view: T?, viewId: Int): T? {
-        return view ?: getView(viewId)
-    }
-
-    private fun selectConcealedNavIconDrawable() : Drawable {
-        return selectDrawable(this.concealedNavIcon, this.concealedNavIconId, getResources(), getTheme())
-    }
-    private fun selectRevealedNavIconDrawable() : Drawable {
-        return selectDrawable(this.revealedNavIcon, this.revealedNavIconId, getResources(), getTheme())
-    }
-
-    private fun addRevealData(
-            menuIdToRevealDataMap: MutableMap<Int, RevealData>,
-            dataSource: Mapping, resources: Resources) {
-        val view = dataSource.view ?: getView(dataSource.viewId) ?: throw IllegalStateException(VIEW_IN_MAPPING_NOT_FOUND_MSG)
-        val title = selectString(dataSource.title, dataSource.titleId, resources)
-        menuIdToRevealDataMap[dataSource.menuItemId] = RevealData(view, title)
-    }
-
-    private fun <T: View> getView(id: Int): T? {
-        if (id == EMPTY_ID) return null
-        val activity = this.activity
-        val appCompatActivity = this.appCompatActivity
-        return when {
-            activity != null -> activity.findViewById(id)
-            appCompatActivity != null -> appCompatActivity.findViewById(id)
-            else -> throw IllegalStateException(NO_ACTIVITY_MSG)
-        }
-    }
-    private fun getActivityTitle():CharSequence {
-        val activity = this.activity
-        val appCompatActivity = this.appCompatActivity
-        return when {
-            activity != null -> activity.title
-            appCompatActivity != null -> appCompatActivity.title
-            else -> ""
-        }
-    }
-    private fun getTheme(): Resources.Theme {
-        val activity = this.activity
-        val appCompatActivity = this.appCompatActivity
-        val context = this.context
-        return when {
-            activity != null -> activity.theme
-            appCompatActivity != null -> appCompatActivity.theme
-            context != null -> context.theme
-            else -> throw IllegalStateException(NO_CONTEXT_MSG)
-        }
-    }
-    private fun getResources(): Resources {
-        val activity = this.activity
-        val appCompatActivity = this.appCompatActivity
-        val context = this.context
-        return when {
-            activity != null -> activity.resources
-            appCompatActivity != null -> appCompatActivity.resources
-            context != null -> context.resources
-            else -> throw IllegalStateException(NO_CONTEXT_MSG)
-        }
-    }
-    private fun selectString(string: CharSequence?, stringId: Int, resources: Resources): CharSequence {
-        return when {
-            string != null -> string
-            stringId!= EMPTY_ID -> resources.getString(stringId)
-            else -> ""
-        }
-    }
-    private fun selectDrawable(drawable: Drawable?, drawableId: Int, resources: Resources, theme: Resources.Theme) : Drawable {
-        return when {
-            drawable != null -> drawable
-            drawableId != EMPTY_ID -> getDrawable(drawableId, resources, theme)
-            else -> throw IllegalStateException(NO_DRAWABLE_MSG)
-        }
-    }
-    private fun getDrawable(resId: Int, resources: Resources, theme: Resources.Theme): Drawable {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            resources.getDrawable(resId, theme)
-        } else {
-            resources.getDrawable(resId)
-        }
-    }
+class LambdaListener(
+        private val onBeforeConcealAction: (BackdropBackLayer, View) -> Boolean ,
+        private val onConcealAction: (BackdropBackLayer, View) -> Unit,
+        private val onBeforeRevealAction: (BackdropBackLayer, View) -> Boolean,
+        private val onRevealAction: (BackdropBackLayer, View) -> Unit
+): BackdropBackLayer.Listener {
+    override fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View) = onBeforeRevealAction(backLayer, revealedView)
+    override fun onReveal(backLayer: BackdropBackLayer, revealedView: View) = onRevealAction(backLayer, revealedView)
+    override fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View) = onBeforeConcealAction(backLayer, revealedView)
+    override fun onConceal(backLayer: BackdropBackLayer, revealedView: View) = onConcealAction(backLayer, revealedView)
 }
