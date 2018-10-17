@@ -94,9 +94,8 @@ class BackdropBackLayer : ViewGroup {
     fun removeAnimatorProvider(provider: AnimatorProvider): Boolean = animatorProviders.remove(provider)
 
     fun getInteractionData(id: Int): BackdropBackLayerInteractionData = getInteractionData(findViewById<View>(id))
-    fun getInteractionData(view: View): BackdropBackLayerInteractionData
-            = interactionData[view]
-                ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
+    fun getInteractionData(view: View): BackdropBackLayerInteractionData = interactionData[view]
+            ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
 
     override fun addView(child: View, index: Int, params: ViewGroup.LayoutParams) {
         super.addView(child, index, params)
@@ -275,11 +274,13 @@ class BackdropBackLayer : ViewGroup {
         }
     }
 
-    internal fun notifyBeforeReveal(revealedView: View) : Boolean {
+
+    // @return <strong>true</strong> if revealing is canceled; otherwise <strong>false</strong>.
+    internal fun notifyBeforeReveal(revealedView: View): Boolean {
         for (listener in listeners) {
-            return listener.onBeforeReveal(this, revealedView)
+            if (listener.onBeforeReveal(this, revealedView)) return true
         }
-        return true
+        return false
     }
 
     internal fun notifyConceal(revealedView: View) {
@@ -288,11 +289,12 @@ class BackdropBackLayer : ViewGroup {
         }
     }
 
-    internal fun notifyBeforeConceal(revealedView: View) : Boolean {
+    // @return <strong>true</strong> if concealing is canceled; otherwise <strong>false</strong>.
+    internal fun notifyBeforeConceal(revealedView: View): Boolean {
         for (listener in listeners) {
-            listener.onBeforeConceal(this, revealedView)
+            if (listener.onBeforeConceal(this, revealedView)) return true
         }
-        return true
+        return false
     }
 
     internal fun addCustomRevealAnimators(animatorSet: AnimatorSet,
@@ -312,10 +314,14 @@ class BackdropBackLayer : ViewGroup {
     }
 
     interface Listener {
+        // @return <strong>true</strong> if revealing is canceled; otherwise <strong>false</strong>.
         fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean
+
         fun onReveal(backLayer: BackdropBackLayer, revealedView: View)
 
+        // @return <strong>true</strong> if concealing is canceled; otherwise <strong>false</strong>.
         fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View): Boolean
+
         fun onConceal(backLayer: BackdropBackLayer, revealedView: View)
     }
 
@@ -396,29 +402,30 @@ class BackdropBackLayer : ViewGroup {
         }
     }
 
-    open class FrontLayerBehavior<T : View> : CoordinatorLayout.Behavior<T>, FrontLayerClickListener {
+    open class FrontLayerBehavior<T : View> : CoordinatorLayout.Behavior<T> {
         private var indent: Int = 0
         private var lastInsets: WindowInsetsCompat? = null
 
         private var backLayer: BackdropBackLayer? = null
         protected open var animatorProvider = AnimatorProvider<T>()
-        private lateinit var frontViewOnClickStrategy: FrontLayerBehaviorOnClickStrategy
 
-        override val concealOnClick: Boolean
-            get() = frontViewOnClickStrategy is ConcealOnClickFrontLayerBehaviorOnClickStrategy
+        private var frontViewOnClickStrategy: FrontLayerBehaviorOnClickStrategy
+                = ConcealOnClickFrontLayerBehaviorOnClickStrategy()
+        var concealOnClick: Boolean = true
+            set(value) {
+                if (value == field) return
+                frontViewOnClickStrategy = if (value) {
+                    ConcealOnClickFrontLayerBehaviorOnClickStrategy()
+                } else {
+                    NotConcealOnClickFrontLayerBehaviorOnClickStrategy
+                }
+                field = value
+            }
 
-        constructor() : super() {
-            allowConcealOnClick()
-        }
-
+        constructor() : super()
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs) {
             val typedArray = context.obtainStyledAttributes(attrs, R.styleable.BackdropBackLayer_FrontLayerBehavior)
-            var concealOnClick = typedArray.getBoolean(R.styleable.BackdropBackLayer_FrontLayerBehavior_behavior_concealOnClick, true)
-            if (concealOnClick) {
-                allowConcealOnClick()
-            } else {
-                disallowConcealOnClick()
-            }
+            concealOnClick = typedArray.getBoolean(R.styleable.BackdropBackLayer_FrontLayerBehavior_behavior_concealOnClick, true)
             typedArray.recycle()
         }
 
@@ -495,19 +502,6 @@ class BackdropBackLayer : ViewGroup {
             return frontViewOnClickStrategy.onTouchEvent(child, ev)
         }
 
-        override fun allowConcealOnClick() {
-            allowConcealOnClick(EmptyFrontLayerClickCallback)
-        }
-
-        override fun allowConcealOnClick(callback: FrontLayerClickCallback) {
-            frontViewOnClickStrategy = ConcealOnClickFrontLayerBehaviorOnClickStrategy(callback)
-            frontViewOnClickStrategy.setBackLayer(backLayer)
-        }
-
-        override fun disallowConcealOnClick() {
-            frontViewOnClickStrategy = NotConcealOnClickFrontLayerBehaviorOnClickStrategy
-        }
-
         open class AnimatorProvider<T : View> : BackdropBackLayer.AnimatorProvider {
             lateinit var frontLayer: T
 
@@ -532,7 +526,7 @@ class BackdropBackLayer : ViewGroup {
         constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
     }
 
-    open class SimpleBackdropListener : Listener {
+    open class SimpleListener : Listener {
         override fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean = false
         override fun onReveal(backLayer: BackdropBackLayer, revealedView: View) {}
 

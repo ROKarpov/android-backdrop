@@ -7,41 +7,23 @@ import androidx.core.view.GestureDetectorCompat
 import java.lang.ref.WeakReference
 
 interface FrontLayerBehaviorOnClickStrategy {
-    fun setBackLayer(backLayer: BackdropBackLayer?)
+    fun setBackLayer(backLayer: BackdropBackLayer)
     fun onInterceptTouchEvent(child: View, ev: MotionEvent): Boolean
     fun onTouchEvent(child: View, ev: MotionEvent): Boolean
 }
 
-interface FrontLayerClickListener {
-    val concealOnClick: Boolean
 
-    fun allowConcealOnClick()
-    fun allowConcealOnClick(callback: FrontLayerClickCallback)
-    fun disallowConcealOnClick()
-}
-
-interface FrontLayerClickCallback {
-    fun onRevealedFrontViewClick()
-}
-
-object EmptyFrontLayerClickCallback : FrontLayerClickCallback {
-    override fun onRevealedFrontViewClick() {}
-}
-
-
-class ConcealOnClickFrontLayerBehaviorOnClickStrategy(
-        private val clickCallback: FrontLayerClickCallback
-) : FrontLayerBehaviorOnClickStrategy {
-    private var backLayer = WeakReference<BackdropBackLayer>(null)
+class ConcealOnClickFrontLayerBehaviorOnClickStrategy : FrontLayerBehaviorOnClickStrategy {
+    private lateinit var backLayer: BackdropBackLayer
     private val gestureDetectorCompat: GestureDetectorCompat = GestureDetectorCompat(null, FrontViewGestureListener(this))
 
 
-    override fun setBackLayer(backLayer: BackdropBackLayer?) {
-        this.backLayer = WeakReference<BackdropBackLayer>(backLayer)
+    override fun setBackLayer(backLayer: BackdropBackLayer) {
+        this.backLayer = backLayer
     }
 
     override fun onInterceptTouchEvent(child: View, ev: MotionEvent): Boolean {
-        return (backLayer.get()?.state == BackdropBackLayerState.REVEALED) && isTouchInView(child, ev)
+        return (backLayer.state == BackdropBackLayerState.REVEALED) && isTouchInView(child, ev)
     }
 
     override fun onTouchEvent(child: View, ev: MotionEvent): Boolean {
@@ -71,17 +53,14 @@ class ConcealOnClickFrontLayerBehaviorOnClickStrategy(
         override fun onSingleTapUp(e: MotionEvent?): Boolean = onTap()
 
         private fun onTap(): Boolean {
-            owner.get()?.let {
-                it.backLayer.get()?.concealBackView()
-                it.clickCallback.onRevealedFrontViewClick()
-            }
+            owner.get()?.let { it.backLayer.concealBackView() }
             return true
         }
     }
 }
 
 object NotConcealOnClickFrontLayerBehaviorOnClickStrategy : FrontLayerBehaviorOnClickStrategy {
-    override fun setBackLayer(backLayer: BackdropBackLayer?) {}
+    override fun setBackLayer(backLayer: BackdropBackLayer) {}
     override fun onInterceptTouchEvent(child: View, ev: MotionEvent): Boolean = false
     override fun onTouchEvent(child: View, ev: MotionEvent): Boolean = false
 }

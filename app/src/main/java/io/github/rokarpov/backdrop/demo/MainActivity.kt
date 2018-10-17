@@ -34,7 +34,6 @@ class MainActivity : AppCompatActivity() {
         val backLayer = findViewById<BackdropBackLayer>(R.id.rootLayout)
         backdropController = BackdropController.build(backLayer, applicationContext) {
             supportToolbar = toolbar
-            frontLayer = findViewById(R.id.main__front_layer)
             navigationIconSettings(navigationView) {
                 titleId = R.string.main__navigation_title
             }
