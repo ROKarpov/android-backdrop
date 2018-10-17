@@ -1,5 +1,7 @@
 package io.github.rokarpov.backdrop.demo
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.annotation.TargetApi
 import android.content.Context
@@ -15,6 +17,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.github.rokarpov.backdrop.*
 import io.github.rokarpov.backdrop.demo.viewmodels.SuggestionViewModel
+import java.lang.ref.WeakReference
 
 class SearchBackView: RelativeLayout {
     private val suggestionListAdapter = SuggestionListAdapter()
@@ -85,7 +88,13 @@ class SearchBackView: RelativeLayout {
 
             addHideAnimator(animatorSet, contentView.inputLayout, delay, duration)
             addHideAnimator(animatorSet, contentView.suggestionList, delay, duration)
-            addHideAnimator(animatorSet, contentView, delay + duration, duration)
+
+            val weakContentView = WeakReference(contentView)
+            animatorSet.addListener(object: AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator?) {
+                    weakContentView.get()?.let { hideView(it) }
+                }
+            })
             return duration
         }
     }

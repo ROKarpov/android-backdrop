@@ -50,6 +50,7 @@ class BackdropController {
 
         this.toolbarStrategy = toolbarStrategy
         this.toolbarStrategy.setOwner(this)
+        this.toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
 
         this.frontLayerStrategy = frontLayerStrategy
         this.frontLayerStrategy.setOwner(this)
@@ -90,9 +91,12 @@ class BackdropController {
 
 
     internal fun updateControllerOnConceal(): Boolean {
-        toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
-        isBackdropRevealed = false
-        return backLayer.concealBackView()
+        val isConcealed = backLayer.concealBackView()
+        if (isConcealed) {
+            toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
+            isBackdropRevealed = false
+        }
+        return isConcealed
     }
 
     internal fun updateControllerOnReveal(
@@ -100,9 +104,12 @@ class BackdropController {
             revealedTitle: CharSequence,
             revealedNavIcon: Drawable
     ): Boolean {
-        toolbarStrategy.updateContent(revealedTitle, revealedNavIcon)
-        isBackdropRevealed = true
-        return backLayer.revealBackView(revealedView)
+        val isRevealed = backLayer.revealBackView(revealedView)
+        if (isRevealed) {
+            toolbarStrategy.updateContent(revealedTitle, revealedNavIcon)
+            isBackdropRevealed = true
+        }
+        return isRevealed
     }
 
     private fun findDataByView(view: View?): ControllerData? {
@@ -225,6 +232,12 @@ class BackdropController {
             settings.init()
             interactionSettingsField.add(settings)
             return settings
+        }
+
+        fun listener(init: ListenerBuilder.() -> Unit) {
+            val builder = ListenerBuilder()
+            builder.init()
+            backLayer.addBackdropListener(builder.build())
         }
 
         @TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -560,4 +573,38 @@ private class BackdropFrontLayerStrategy(
             owner.get()?.updateControllerOnConceal()
         }
     }
+}
+
+class ListenerBuilder {
+    private var onBeforeConcealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> true }
+    private var onConcealAction: (BackdropBackLayer, View) -> Unit = { _, _ -> }
+    private var onBeforeRevealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> true }
+    private var onRevealAction: (BackdropBackLayer, View) -> Unit = { _, _ -> }
+
+    fun onBeforeConceal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Boolean) {
+        onBeforeConcealAction = action
+    }
+    fun onConceal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Unit) {
+        onConcealAction = action
+    }
+    fun onBeforeReveal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Boolean) {
+        onBeforeRevealAction = action
+    }
+    fun onReveal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Unit) {
+        onRevealAction = action
+    }
+
+    fun build(): BackdropBackLayer.Listener = LambdaListener(onBeforeConcealAction, onConcealAction, onBeforeRevealAction, onRevealAction)
+}
+
+class LambdaListener(
+        private val onBeforeConcealAction: (BackdropBackLayer, View) -> Boolean ,
+        private val onConcealAction: (BackdropBackLayer, View) -> Unit,
+        private val onBeforeRevealAction: (BackdropBackLayer, View) -> Boolean,
+        private val onRevealAction: (BackdropBackLayer, View) -> Unit
+): BackdropBackLayer.Listener {
+    override fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View) = onBeforeRevealAction(backLayer, revealedView)
+    override fun onReveal(backLayer: BackdropBackLayer, revealedView: View) = onRevealAction(backLayer, revealedView)
+    override fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View) = onBeforeConcealAction(backLayer, revealedView)
+    override fun onConceal(backLayer: BackdropBackLayer, revealedView: View) = onConcealAction(backLayer, revealedView)
 }

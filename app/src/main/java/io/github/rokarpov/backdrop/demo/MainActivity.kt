@@ -7,7 +7,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.widget.Toolbar
-import android.view.MenuItem
 import android.view.View
 import io.github.rokarpov.backdrop.*
 import android.view.inputmethod.InputMethodManager
@@ -33,7 +32,6 @@ class MainActivity : AppCompatActivity() {
         toolbar.inflateMenu(R.menu.menu_main)
 
         val backLayer = findViewById<BackdropBackLayer>(R.id.rootLayout)
-
         backdropController = BackdropController.build(backLayer, applicationContext) {
             supportToolbar = toolbar
             frontLayer = findViewById(R.id.main__front_layer)

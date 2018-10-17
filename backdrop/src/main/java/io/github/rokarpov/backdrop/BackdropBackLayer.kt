@@ -12,7 +12,6 @@ import android.util.AttributeSet
 import android.view.*
 import android.view.MotionEvent
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import java.lang.ref.WeakReference
 
 class BackdropBackLayer : ViewGroup {
     companion object {
@@ -23,9 +22,9 @@ class BackdropBackLayer : ViewGroup {
         internal val DEFAULT_STATE = BackdropBackLayerState.CONCEALED
 
         @JvmField
-        var fadeOutTime: Long = 100 // First step
+        var fadeOutTime: Long = 100
         @JvmField
-        var fadeInTime: Long = 200 // Second step
+        var fadeInTime: Long = 200
         @JvmField
         var oneStepAnimationTime: Long = 263
     }
@@ -46,7 +45,7 @@ class BackdropBackLayer : ViewGroup {
     @JvmField
     internal var currentAnimator: Animator? = null
 
-    private val listeners: MutableList<WeakReference<Listener>> = mutableListOf()
+    private val listeners: MutableList<Listener> = mutableListOf()
     private val animatorProviders: MutableList<AnimatorProvider> = mutableListOf()
 
     constructor(context: Context) : this(context, null)
@@ -88,40 +87,16 @@ class BackdropBackLayer : ViewGroup {
         return state.onConceal(this, viewToConceal, interactionData, withAnimation)
     }
 
-    fun addBackdropListener(listener: Listener): Boolean {
-        return listeners.add(WeakReference(listener))
-    }
+    fun addBackdropListener(listener: Listener): Boolean = listeners.add(listener)
+    fun removeBackdropListener(listener: Listener): Boolean = listeners.remove(listener)
 
-    fun removeBackdropListener(listener: Listener): Boolean {
-        for (weakListener in listeners) {
-            when (weakListener.get()) {
-                null -> listeners.remove(weakListener)
-                listener -> {
-                    listeners.remove(weakListener)
-                    return true
-                }
-            }
-        }
-        return false
-    }
+    fun addAnimatorProvider(provider: AnimatorProvider): Boolean = animatorProviders.add(provider)
+    fun removeAnimatorProvider(provider: AnimatorProvider): Boolean = animatorProviders.remove(provider)
 
-    fun addAnimatorProvider(provider: AnimatorProvider): Boolean {
-        return animatorProviders.add(provider)
-    }
-
-    fun removeAnimatorProvider(provider: AnimatorProvider): Boolean {
-        return animatorProviders.remove(provider)
-    }
-
-    fun getInteractionData(view: View): BackdropBackLayerInteractionData {
-        return interactionData[view]
+    fun getInteractionData(id: Int): BackdropBackLayerInteractionData = getInteractionData(findViewById<View>(id))
+    fun getInteractionData(view: View): BackdropBackLayerInteractionData
+            = interactionData[view]
                 ?: throw IllegalArgumentException(NO_INTERACTION_DATA_FOR_VIEW_MSG)
-    }
-
-    fun getInteractionData(id: Int): BackdropBackLayerInteractionData {
-        val view: View = findViewById(id)
-        return getInteractionData(view)
-    }
 
     override fun addView(child: View, index: Int, params: ViewGroup.LayoutParams) {
         super.addView(child, index, params)
@@ -296,14 +271,28 @@ class BackdropBackLayer : ViewGroup {
 
     internal fun notifyReveal(revealedView: View) {
         for (listener in listeners) {
-            listener.get()?.onReveal(this, revealedView) ?: listeners.remove(listener)
+            listener.onReveal(this, revealedView)
         }
+    }
+
+    internal fun notifyBeforeReveal(revealedView: View) : Boolean {
+        for (listener in listeners) {
+            return listener.onBeforeReveal(this, revealedView)
+        }
+        return true
     }
 
     internal fun notifyConceal(revealedView: View) {
         for (listener in listeners) {
-            listener.get()?.onConceal(this, revealedView) ?: listeners.remove(listener)
+            listener.onConceal(this, revealedView)
         }
+    }
+
+    internal fun notifyBeforeConceal(revealedView: View) : Boolean {
+        for (listener in listeners) {
+            listener.onBeforeConceal(this, revealedView)
+        }
+        return true
     }
 
     internal fun addCustomRevealAnimators(animatorSet: AnimatorSet,
@@ -323,10 +312,10 @@ class BackdropBackLayer : ViewGroup {
     }
 
     interface Listener {
-        fun onRevealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long)
+        fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean
         fun onReveal(backLayer: BackdropBackLayer, revealedView: View)
 
-        fun onConcealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long)
+        fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View): Boolean
         fun onConceal(backLayer: BackdropBackLayer, revealedView: View)
     }
 
@@ -544,10 +533,10 @@ class BackdropBackLayer : ViewGroup {
     }
 
     open class SimpleBackdropListener : Listener {
-        override fun onRevealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long) {}
+        override fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean = false
         override fun onReveal(backLayer: BackdropBackLayer, revealedView: View) {}
 
-        override fun onConcealStart(backLayer: BackdropBackLayer, revealedView: View, animationDuration: Long) {}
+        override fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View): Boolean = false
         override fun onConceal(backLayer: BackdropBackLayer, revealedView: View) {}
     }
 }
