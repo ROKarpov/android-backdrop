@@ -10,7 +10,6 @@ import android.view.View
 import android.widget.Toolbar
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.coordinatorlayout.widget.CoordinatorLayout
 import java.lang.ref.WeakReference
 
 const val EMPTY_ID: Int = -1
@@ -30,95 +29,83 @@ class BackdropController {
     private val backLayer: BackdropBackLayer
     private val concealedNavIcon: Drawable
     private val concealedTitle: CharSequence
-    private val frontLayerStrategy: FrontLayerStrategy
     private var isBackdropRevealed: Boolean = false
-    private val mMenuRevealData: Map<Int, ControllerData>
-    private val mNavIconRevealData: ControllerData
+    private val menuRevealData: Map<Int, ControllerData>
+    private val navIconRevealData: ControllerData
     private val toolbarStrategy: ToolbarStrategy
 
     private constructor(
             backLayer: BackdropBackLayer,
-            frontLayerStrategy: FrontLayerStrategy,
             navIconRevealData: ControllerData,
             menuRevealData: Map<Int, ControllerData>,
             toolbarStrategy: ToolbarStrategy,
             concealedTitle: CharSequence,
             concealedNavIcon: Drawable) {
         this.backLayer = backLayer
-        this.mNavIconRevealData = navIconRevealData
-        this.mMenuRevealData = menuRevealData
+        this.backLayer.addBackdropListener(BackdropListener(this))
+
+        this.navIconRevealData = navIconRevealData
+        this.menuRevealData = menuRevealData
 
         this.toolbarStrategy = toolbarStrategy
         this.toolbarStrategy.setOwner(this)
         this.toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
 
-        this.frontLayerStrategy = frontLayerStrategy
-        this.frontLayerStrategy.setOwner(this)
-
         this.concealedTitle = concealedTitle
         this.concealedNavIcon = concealedNavIcon
     }
 
-    fun onNavigationIconSelected() {
-        if (isBackdropRevealed) {
-            conceal()
-        } else {
-            mNavIconRevealData?.onReveal(this)
-        }
-    }
-
-    fun onOptionsItemSelected(menuItemId: Int): Boolean {
-        if (menuItemId == R.id.home && isBackdropRevealed) {
-            conceal()
-        } else {
-            mMenuRevealData[menuItemId]?.onReveal(this) ?: return false
-        }
-        return true
-    }
+    fun reveal(view: View): Boolean = backLayer.revealBackView(view)
+    fun conceal(): Boolean = backLayer.concealBackView()
 
     fun syncState() {
         backLayer.onPrepare()
         when (backLayer.state) {
-            BackdropBackLayerState.REVEALED -> {
-                val data = findDataByView(backLayer.revealedView)?.onReveal(this)
-            }
+            BackdropBackLayerState.REVEALED -> findDataByView(backLayer.revealedView)?.onReveal(this)
             BackdropBackLayerState.CONCEALED -> updateControllerOnConceal()
         }
     }
 
-    fun reveal(view: View): Boolean = findDataByView(view)?.onReveal(this) ?: false
-    fun conceal(): Boolean = updateControllerOnConceal()
-
-
-    internal fun updateControllerOnConceal(): Boolean {
-        val isConcealed = backLayer.concealBackView()
-        if (isConcealed) {
-            toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
-            isBackdropRevealed = false
+    internal fun onNavigationIconSelected() {
+        if (isBackdropRevealed) {
+            conceal()
+        } else {
+            navIconRevealData.onMenuItemSelected(this)
         }
-        return isConcealed
+    }
+
+    internal fun onOptionsItemSelected(menuItemId: Int): Boolean {
+        if (menuItemId == R.id.home && isBackdropRevealed) {
+            conceal()
+        } else {
+            menuRevealData[menuItemId]?.onMenuItemSelected(this) ?: return false
+        }
+        return true
+    }
+
+    internal fun updateControllerOnConceal() {
+        toolbarStrategy.updateContent(concealedTitle, concealedNavIcon)
+        isBackdropRevealed = false
     }
 
     internal fun updateControllerOnReveal(
-            revealedView: View,
             revealedTitle: CharSequence,
             revealedNavIcon: Drawable
-    ): Boolean {
-        val isRevealed = backLayer.revealBackView(revealedView)
-        if (isRevealed) {
-            toolbarStrategy.updateContent(revealedTitle, revealedNavIcon)
-            isBackdropRevealed = true
-        }
-        return isRevealed
+    ) {
+        toolbarStrategy.updateContent(revealedTitle, revealedNavIcon)
+        isBackdropRevealed = true
     }
 
     private fun findDataByView(view: View?): ControllerData? {
         if (view == null) return null
-        for ((_, data) in mMenuRevealData) {
+        if ((navIconRevealData is RevealControllerData) && (navIconRevealData.view == view)) return navIconRevealData
+        for ((_, data) in menuRevealData) {
             if ((data is RevealControllerData) && (data.view == view)) return data
         }
         return null
     }
+
+
 
     @DslBackdropControllerMarker
     class Builder(
@@ -130,7 +117,6 @@ class BackdropController {
         }
 
         private var toolbarStrategy: ToolbarStrategy? = null
-        private var frontLayerStrategy: FrontLayerStrategy = NoFrontLayerStrategy
 
         private var navIconRevealSettings: RevealSettings? = null
         private val menuRevealSettings: MutableMap<Int, RevealSettings> = mutableMapOf()
@@ -204,13 +190,6 @@ class BackdropController {
                     concealedNavigationIconId = EMPTY_ID
                 }
                 field = value
-            }
-
-
-        var frontLayer: View? = null
-            set(value) {
-                field = value
-                frontLayerStrategy = createFrontClickStrategy(value)
             }
 
         fun navigationIconSettings(view: View, init: RevealSettings.() -> Unit = { }): RevealSettings {
@@ -344,26 +323,12 @@ class BackdropController {
 
             return BackdropController(
                     backLayer,
-                    frontLayerStrategy,
                     navIconRevealData ?: EmptyControllerData,
                     menuRevealData,
                     toolbarStrategy,
                     concealedTitle,
                     concealedDrawable
             )
-        }
-
-        private fun createFrontClickStrategy(frontLayer: View?): FrontLayerStrategy {
-            val frontLayer = frontLayer ?: return NoFrontLayerStrategy
-            val lp = frontLayer.layoutParams as? CoordinatorLayout.LayoutParams
-                    ?: return NoFrontLayerStrategy
-            val behavior = lp.behavior as? FrontLayerClickListener
-                    ?: return NoFrontLayerStrategy
-            return if (behavior.concealOnClick) {
-                BackdropFrontLayerStrategy(behavior)
-            } else {
-                NoFrontLayerStrategy
-            }
         }
 
         private fun selectString(string: CharSequence?, stringId: Int): CharSequence? {
@@ -388,6 +353,22 @@ class BackdropController {
             } else {
                 context.resources.getDrawable(resId)
             }
+        }
+    }
+
+    class BackdropListener(owner: BackdropController): BackdropBackLayer.SimpleListener() {
+        val weakOwner = WeakReference(owner)
+
+        override fun onBeforeReveal(backLayer: BackdropBackLayer, revealedView: View): Boolean {
+            weakOwner.get()?.let {
+                it.findDataByView(revealedView)?.onReveal(it)
+            }
+            return false
+        }
+
+        override fun onBeforeConceal(backLayer: BackdropBackLayer, revealedView: View): Boolean {
+            weakOwner.get()?.updateControllerOnConceal()
+            return false
         }
     }
 }
@@ -483,7 +464,8 @@ class InteractionSettings(val view: View) {
 
 
 private interface ControllerData {
-    fun onReveal(controller: BackdropController): Boolean
+    fun onMenuItemSelected(controller: BackdropController): Boolean
+    fun onReveal(controller: BackdropController)
 }
 
 private class RevealControllerData(
@@ -491,11 +473,14 @@ private class RevealControllerData(
         val title: CharSequence,
         val navIcon: Drawable
 ) : ControllerData {
-    override fun onReveal(controller: BackdropController): Boolean = controller.updateControllerOnReveal(view, title, navIcon)
+    override fun onMenuItemSelected(controller: BackdropController) = controller.reveal(view)
+    override fun onReveal(controller: BackdropController) = controller.updateControllerOnReveal(title, navIcon)
 }
 
 private object EmptyControllerData : ControllerData {
-    override fun onReveal(controller: BackdropController): Boolean = false
+    override fun onMenuItemSelected(controller: BackdropController) = false
+    override fun onReveal(controller: BackdropController) { }
+
 }
 
 
@@ -549,36 +534,10 @@ private class SupportToolbarStrategy(
     }
 }
 
-
-private interface FrontLayerStrategy {
-    fun setOwner(owner: BackdropController)
-}
-
-private object NoFrontLayerStrategy : FrontLayerStrategy {
-    override fun setOwner(owner: BackdropController) {}
-}
-
-private class BackdropFrontLayerStrategy(
-        private val clickListener: FrontLayerClickListener
-) : FrontLayerStrategy {
-    override fun setOwner(owner: BackdropController) {
-        if (clickListener.concealOnClick)
-            clickListener.allowConcealOnClick(RevealedFrontLayerCallback(owner))
-    }
-
-    class RevealedFrontLayerCallback(controller: BackdropController) : FrontLayerClickCallback {
-        val owner = WeakReference<BackdropController>(controller)
-
-        override fun onRevealedFrontViewClick() {
-            owner.get()?.updateControllerOnConceal()
-        }
-    }
-}
-
 class ListenerBuilder {
-    private var onBeforeConcealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> true }
+    private var onBeforeConcealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> false }
     private var onConcealAction: (BackdropBackLayer, View) -> Unit = { _, _ -> }
-    private var onBeforeRevealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> true }
+    private var onBeforeRevealAction: (BackdropBackLayer, View) -> Boolean = { _, _ -> false }
     private var onRevealAction: (BackdropBackLayer, View) -> Unit = { _, _ -> }
 
     fun onBeforeConceal(action: (backLayer: BackdropBackLayer, revealedView: View) -> Boolean) {
