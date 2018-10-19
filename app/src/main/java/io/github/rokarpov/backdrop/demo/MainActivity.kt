@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
                 titleId = R.string.main__navigation_title
             }
             menuItemRevealSettings(R.id.menu_main__search, searchView)
-            interationSettings(searchView) {
+            interactionSettings(searchView) {
                 hideHeader = true
                 animationProvider = SearchBackView.AnimatorProvider
             }

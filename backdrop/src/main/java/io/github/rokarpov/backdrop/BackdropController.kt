@@ -206,7 +206,7 @@ class BackdropController {
             return settings
         }
 
-        fun interationSettings(view: View, init: InteractionSettings.() -> Unit = { }): InteractionSettings {
+        fun interactionSettings(view: View, init: InteractionSettings.() -> Unit = { }): InteractionSettings {
             val settings = InteractionSettings(view)
             settings.init()
             interactionSettingsField.add(settings)
