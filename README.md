@@ -44,12 +44,12 @@ Note that all unimportant attributes are skipped.
 
 The markup above uses the following attributes:
 
-|Attribute                              |Description                                                                      |
-|---------------------------------------|---------------------------------------------------------------------------------|
-|```layout_childType``` (BackLayer's)   |Specifies whether the view is a header or a revealing content.                   |
-|```layout_hideHeaderOnReveal```        |Specifies whether the header should be hidden, when the view is revealed.        |
-|```layout_minRevealedFrontViewHeight```|Specifies the size of the front layer's on-screen part when the view is revealed.|
-|```layout_childType``` (FrontLayer's)  |Specifies whether the view is a header or a revealing content.                   |
+|Attribute                              |Description                                                                        |
+|---------------------------------------|-----------------------------------------------------------------------------------|
+|```layout_childType``` (BackLayer's)   |Specifies whether the view is a header or a revealing content.                     |
+|```layout_hideHeaderOnReveal```        |Specifies whether the header should be hidden, when the view is revealed.          |
+|```layout_minRevealedFrontViewHeight```|Specifies the size of the front layer's on-screen part when the view is revealed.  |
+|```layout_childType``` (FrontLayer's)  |Specifies whether the view is a front layer's subheader and should not be scrimmed.|
 
 The Backdrop component layout configuration is done. 
 Now you can customize how it behaves using the ```BackdropController``` class and its builder:
