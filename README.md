@@ -1,5 +1,7 @@
 # Backdrop
 
+[ ![Download](https://api.bintray.com/packages/rokarpov/Backdrop/backdrop/images/download.svg) ](https://bintray.com/rokarpov/Backdrop/backdrop/_latestVersion)
+
 This library provides layouts and the CoordinatorLayout's behaviors that allow you to use the [Backdrop](https://material.io/design/components/backdrop.html) component in your app:
 
 ![Title Image](./docs/_static/title-image.gif)
